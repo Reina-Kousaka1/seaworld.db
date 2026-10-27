@@ -30,13 +30,26 @@ SeaWorld DB is versioned as `0.0.x` while the file format, recovery, and API are
 - [x] Add non-overwriting compaction in V2 and explicit V1-to-V2 copy migration while preserving UUIDs, live IDs, indexes, and ID high-water state.
 - [x] Document the implemented transaction, index, query, format, and security limits without claiming full ACID or SQL support.
 
+## Phase 2: snapshots and indexed ranges
+
+- [x] Keep V1/V2 replay compatible and make V3 the default format with a durable commit-version watermark.
+- [x] Add owning MVCC snapshots with bounded leases and retained-history bytes.
+- [x] Support one writer and fixed read-only handles with shared/exclusive file locks; reject a second writer.
+- [x] Keep snapshot reads stable across committed updates and deletes.
+- [x] Add ordered single-field range candidates and recheck every candidate against the full query filter.
+- [x] Refuse V3 compaction while snapshot leases are active and preserve/advance the version watermark safely.
+- [x] Add deterministic state-model, MVCC, index-range, read-only recovery, and process crash coverage.
+- [ ] Persist index-entry deltas or page-based indexes; index entries are currently rebuilt from documents.
+- [ ] Add a fuzzing harness and broader randomized index/recovery properties.
+- [ ] Verify stress behavior under CI on Linux and Windows before making stability claims.
+
 ## Next engine wave
 
 1. Fuzz malformed headers, record streams, transaction state machines, and nested document decoders.
-2. Design page/block allocation and a migration path before adding fixed-size page storage or persistent tree indexes.
-3. Add transaction isolation only with an explicit reader/writer concurrency model and its own recovery tests.
+2. Implement transactional index-entry persistence, then design page/block allocation and its migration path before adding on-disk B+Tree pages.
+3. Expand concurrency and corruption stress coverage for snapshot history limits, lock contention, compaction, and recovery.
 4. Specify and implement a narrow SQL parser adapter over the existing native query AST; keep SQL and native execution on one engine.
-5. Add storage-format golden fixtures for V2 and reproducible benchmarks after correctness and crash recovery are established.
+5. Add storage-format golden fixtures for V2/V3 and reproducible benchmarks after correctness and crash recovery are established.
 
 ## Explicitly out of scope
 

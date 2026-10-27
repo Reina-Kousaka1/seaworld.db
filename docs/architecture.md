@@ -10,7 +10,7 @@ The first release is embedded-first: an application opens a local `*.seaworld.db
 
 The engine core is implemented in stable Rust. `Cargo.toml` declares Rust 1.89 as its minimum version. Rust is the engine implementation language; future drivers can target Java, Python, JavaScript/TypeScript, Tyvera, and other hosts without changing that boundary.
 
-V1 remains byte-for-byte supported. New databases use the explicitly versioned V2 grammar for transactions and index metadata. V1 handles keep single-operation CRUD and can be copied to V2 through a non-overwriting migration path before using transactions or indexes.
+V1 remains byte-for-byte supported. New databases use the explicitly versioned V3 header and transaction grammar; V2 remains readable and writable through an explicit constructor. V1 handles keep single-operation CRUD and can be copied to V2 or V3 through a non-overwriting migration path before using transactions or indexes.
 
 | Area | C++ | Rust | Java 21 |
 | --- | --- | --- | --- |
@@ -56,18 +56,18 @@ The query engine consumes SeaWorld's own typed query representation. Adapters tr
 
 ## Modules
 
-- **Storage engine:** owns file creation/opening, V1/V2 versioned headers, append-only record blocks, checksums, bounded reads, `File::sync_all` durability calls, exclusive OS file locks, version-aware transaction recovery, and compacted copies without replacing the source.
+- **Storage engine:** owns file creation/opening, V1/V2/V3 versioned headers, append-only record blocks, checksums, bounded reads, `File::sync_all` durability calls, an exclusive writer sidecar lock plus shared/exclusive database-file locks, version-aware transaction recovery, and compacted copies without replacing the source.
 - **Document model:** defines null, boolean, signed 64-bit integer, finite floating point, UTF-8 string, binary, array, and object values. Nested objects and arrays are ordinary values, not a SQL-only feature.
 - **Collections:** group documents and persist collection metadata. Document IDs are stable, positive 64-bit identifiers within a database.
-- **Index engine:** the primary ID map and V2 single-field/unique secondary indexes are rebuilt from committed state on replay. Compound and text indexes are future work.
+- **Index engine:** the primary ID map and single-field/unique secondary indexes are rebuilt from committed state on replay. Ordered in-memory entries support equality and range candidates. Persistent index entries/pages, compound indexes, and text indexes are future work.
 - **Query engine/planner:** evaluates a typed native filter AST, chooses ID/index lookups or scans, and exposes a basic explain plan. It is independent of SQL.
-- **Transactions/recovery:** V2 mutations are grouped under begin/commit markers in the existing append log. Recovery applies complete committed batches and discards an uncommitted tail. No separate WAL or MVCC is implemented.
+- **Transactions/recovery:** V2/V3 mutations are grouped under begin/commit markers in the existing append log. Recovery applies complete committed batches and discards an uncommitted tail. V3 snapshots retain bounded in-memory document versions; no separate WAL or page-based recovery exists.
 - **SQL interface:** a future adapter for a documented subset. It maps SQL null, missing fields, nested paths, arrays, and flexible schemas onto document/query semantics described in `query-engine.md`.
 - **Server/driver:** a later transport boundary around the same engine. No cluster, replication, or wire-protocol compatibility is in scope.
 
 ## Concurrency and ownership
 
-Rust's exclusive handle requires mutable access for writes, serializing mutations through that handle, and takes an exclusive OS file lock so cooperating SeaWorld handles do not write the same file concurrently. Lock enforcement is platform-dependent; another program may still modify the file outside SeaWorld's locking protocol. The engine does not offer concurrent readers, MVCC, or isolation levels. A future server can own one engine handle and schedule requests over a protocol without moving network concerns into storage code.
+One exclusive writer handle and any fixed read-only handles are supported. The writer lock prevents a second cooperating writer; readers replay under a shared commit lock and then keep an in-memory view. V3 snapshots held by the writer retain a stable in-process view across commits. Lock enforcement is platform-dependent; another program may still modify the file outside SeaWorld's locking protocol. No isolation level beyond snapshot reads is promised. A future server can own one engine handle and schedule requests over a protocol without moving network concerns into storage code.
 
 ## Integrity and trust boundaries
 

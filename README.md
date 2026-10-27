@@ -10,9 +10,9 @@ The engine is being built in Rust around its own document model, query represent
 
 Current development version: `0.0.1-dev`.
 
-The Phase 0 engine milestone is complete. Rust continues to read and write the original V1 file format, protected by a Java-produced fixture and byte comparison. New databases use V2, which adds single-writer multi-operation transactions with commit-marker recovery, persistent single-field and unique indexes, a typed native query AST, and non-overwriting compaction/migration to V2. The Java engine and test suite were removed after the Rust compatibility gate passed. See [the roadmap](docs/roadmap.md) for implemented and planned work.
+The Phase 0 engine milestone is complete. Rust continues to read and write the original V1 file format, protected by a Java-produced fixture and byte comparison. New databases use V3, which retains V2 transaction records and adds MVCC snapshots, fixed read-only handles, single-writer locking, a commit-version watermark, and indexed equality/range candidate lookup. V1/V2 compatibility and V2 migration remain available. Secondary index definitions persist while their entries rebuild from documents; page-based index storage is not implemented. The Java engine and test suite were removed after the Rust compatibility gate passed. See [the roadmap](docs/roadmap.md) for implemented and planned work.
 
-SeaWorld DB does not claim production readiness, full ACID compliance, concurrent readers or MVCC, a complete SQL implementation, distribution, or production security. Transactions use one exclusive writer handle and the append log as their recovery record; recovery and durability guarantees are limited to the documented behavior and tested environments.
+SeaWorld DB does not claim production readiness, full ACID compliance, a complete SQL implementation, distribution, or production security. Its current reader/writer model allows one writer and fixed read-only views plus in-process MVCC snapshots. Recovery and durability guarantees are limited to the documented behavior and tested environments; process-kill tests do not establish power-loss durability.
 
 ## Architecture
 

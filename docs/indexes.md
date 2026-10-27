@@ -2,7 +2,7 @@
 
 ## Definitions and persistence
 
-V2 supports single-field indexes and unique single-field indexes. An index definition stores the collection ID, normalized `FieldPath`, index ID, and unique flag. Definitions are written as checksummed V2 metadata records; index entries are rebuilt from committed documents on open and after recovery. The file does not store B-tree or hash-table memory layouts.
+V2 and V3 support single-field indexes and unique single-field indexes. An index definition stores the collection ID, normalized `FieldPath`, index ID, and unique flag. Definitions are written as checksummed metadata records; index entries are rebuilt from committed documents on open and after recovery. The file does not store B-tree or hash-table memory layouts.
 
 This rebuild-on-open choice keeps the durable format small and lets the engine validate the index against its source documents. It trades startup time for simpler corruption handling. A duplicate or unsupported value encountered while rebuilding a persisted unique index is an integrity error.
 
@@ -16,8 +16,8 @@ Float keys use total numeric ordering for finite values and treat negative and p
 
 Creating an index scans the collection before appending its definition. A unique-index creation fails without changing the file if it finds duplicate indexed values. Unique constraints are checked immediately for each staged transaction operation against the transaction's current view. Every committed mutation updates the document state, primary-ID map, and all secondary indexes together after the commit marker has synchronized. Recovery and compaction rebuild the same entries from committed logical state.
 
-Indexes are available only in V2. A V1 file must first be copied to V2 through the documented non-overwriting upgrade/compaction API.
+Indexes are available in V2 and V3. A V1 file must first be copied to V2 or V3 through the documented non-overwriting upgrade/compaction API.
 
 ## Limits and current scope
 
-The engine caps definitions per database and bounds path depth and segment bytes. Compound, text, geospatial, array-element, and persistent page indexes are not implemented. The current planner uses secondary indexes for equality predicates; other operators remain correct through scans.
+The engine caps definitions per database and bounds path depth and segment bytes. Compound, text, geospatial, array-element, and persistent page indexes are not implemented. The current planner uses secondary indexes for equality and range candidates; other operators remain correct through scans, and every indexed candidate is rechecked against the complete filter.

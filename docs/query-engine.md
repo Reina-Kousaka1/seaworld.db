@@ -12,7 +12,7 @@ The AST supports ID equality, field comparisons (`Eq`, `Ne`, `Lt`, `Lte`, `Gt`, 
 
 ## Planner and explain
 
-The planner chooses a primary-ID lookup for an ID equality, a secondary-index lookup for an indexed equality predicate (including a usable predicate under `And`), or a full collection scan. Other boolean shapes use a scan. Every candidate from an index is checked against the complete filter. `Explain` exposes the selected plan; it is diagnostic, not a promise of cost-based optimization.
+The planner chooses a primary-ID lookup for an ID equality, a secondary-index lookup for an indexed equality predicate, an ordered range candidate lookup for a comparable indexed range predicate, or a full collection scan. Indexed predicates under `And` can provide candidates; other boolean shapes use a scan. Every candidate from an index is checked against the complete filter. `Explain` exposes the selected plan; it is diagnostic, not a promise of cost-based optimization.
 
 Results are deterministic: absent an explicit sort, rows are in ascending document-ID order. `limit` and `offset` have explicit upper bounds. Sorting supports missing, null, boolean, integer, finite float, and string values, ordered by that type rank and then by value; unsupported Binary/Array/Object sort values return a query error. Equal sort keys always use ascending document ID as the tie-breaker, including descending sorts.
 
