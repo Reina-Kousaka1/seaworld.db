@@ -8,10 +8,10 @@ SeaWorld DB is versioned as `0.0.x` while the file format, recovery, and API are
 - [x] Compare C++, Rust, and Java for an embedded document engine.
 - [x] Define the initial versioned header and record-block format.
 - [x] Preserve the selected repository's existing AGPL-3.0 license.
-- [ ] Commit and push the engine foundation to the chosen GitHub repository.
-- [ ] Create, validate, close, reopen, and read a SeaWorld database file.
-- [ ] Persist collections and documents with nested objects and arrays.
-- [ ] Add validation and CI for the actual engine code.
+- [x] Commit and push the engine foundation to the chosen GitHub repository.
+- [x] Create, validate, close, reopen, and read a SeaWorld database file.
+- [x] Persist collections and documents with nested objects and arrays.
+- [x] Add validation and CI for the actual engine code.
 
 ## Next engine wave
 
