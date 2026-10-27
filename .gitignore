@@ -1,0 +1,15 @@
+# Java build output
+/build/
+/out/
+*.class
+
+# SeaWorld database files and transient files
+*.seaworld.db
+*.seaworld.db-*
+*.swdb-tmp
+
+# IDE and OS metadata
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
