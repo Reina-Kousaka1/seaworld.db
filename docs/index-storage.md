@@ -8,6 +8,14 @@ Index-entry deltas in the same transaction log remain a candidate for the next e
 
 The ordered in-memory index supports equality and range candidate lookup. Index candidates are still checked against the complete filter. Sorting currently sorts query results; it does not stream directly from an index.
 
+## File strategy for a future persistent tree
+
+The selected direction is **A: store index pages in the same database file**. Persistent pages are not implemented yet. This keeps document commits, index-root publication, checksums, and recovery in one append-only file. A future writer would append copy-on-write pages, then publish the new roots in the transaction's commit record; recovery would expose only roots named by committed transactions. Uncommitted or superseded pages would remain unreachable until compaction.
+
+This choice avoids a two-file commit protocol: with index sidecars, a crash could leave the document log and index file at different generations, and correct recovery would need generation checks plus deterministic rebuild or coordinated replacement. A single file also avoids a second data-file lock and cross-platform sidecar replacement rules on Windows and Linux. Compaction can construct and atomically publish one compacted database copy. The tradeoff is that append-only index pages consume the same file-size budget until compaction, and a future page format will need a new format version, likely V4, while keeping V1–V3 readable.
+
+This is an architecture decision for the next storage-format step, not a claim that current secondary entries are persistent or transactionally stored.
+
 ## Persistent B+Tree page design candidate
 
 The append log makes index changes durable but does not yet provide a page allocator or on-disk B+Tree. The next storage-format revision should use a copy-on-write B+Tree whose root is published by a committed log record. A proposed page is 4,096 bytes with a fixed header: `SWIP` magic, page-format version, page type, flags, page ID, key count, payload length, and CRC32C. Remaining bytes are zero-filled reserved space except for the CRC trailer.
