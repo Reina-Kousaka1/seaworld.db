@@ -322,7 +322,8 @@ mod tests {
             any::<bool>().prop_map(Value::Bool),
             any::<i64>().prop_map(Value::Integer),
             any::<f64>()
-                .prop_filter("floating point values must be finite", |value| value.is_finite())
+                .prop_filter("floating point values must be finite", |value| value
+                    .is_finite())
                 .prop_map(Value::Float),
             "[a-zA-Z0-9 _.-]{0,48}".prop_map(|value| Value::String(value.to_string())),
             proptest::collection::vec(any::<u8>(), 0..=48).prop_map(Value::Binary),
@@ -335,12 +336,8 @@ mod tests {
             .prop_recursive(3, 64, 8, |inner| {
                 prop_oneof![
                     proptest::collection::vec(inner.clone(), 0..=5).prop_map(Value::Array),
-                    proptest::collection::btree_map(
-                        "[a-z][a-z0-9_]{0,7}",
-                        inner,
-                        0..=5
-                    )
-                    .prop_map(Value::Object),
+                    proptest::collection::btree_map("[a-z][a-z0-9_]{0,7}", inner, 0..=5)
+                        .prop_map(Value::Object),
                 ]
                 .boxed()
             })
@@ -348,12 +345,8 @@ mod tests {
     }
 
     fn document_strategy() -> impl Strategy<Value = Document> {
-        proptest::collection::btree_map(
-            "[a-z][a-z0-9_]{0,7}",
-            value_strategy(),
-            0..=8,
-        )
-        .prop_map(Document::new)
+        proptest::collection::btree_map("[a-z][a-z0-9_]{0,7}", value_strategy(), 0..=8)
+            .prop_map(Document::new)
     }
 
     proptest::proptest! {
