@@ -573,7 +573,7 @@ proptest::proptest! {
             for operation in operations {
                 apply_generated_operation(&mut indexed_transaction, &mut indexed_model, operation);
                 apply_generated_operation(&mut scan_transaction, &mut full_scan_model, operation);
-                proptest::prop_assert_eq!(indexed_model, full_scan_model);
+                proptest::prop_assert_eq!(&indexed_model, &full_scan_model);
             }
 
             if commit {
@@ -590,8 +590,8 @@ proptest::proptest! {
                 .iter()
                 .map(|(id, value)| (*id, scalar_document(value.clone())))
                 .collect();
-            proptest::prop_assert_eq!(normalized_rows(&indexed, &all), expected);
-            proptest::prop_assert_eq!(normalized_rows(&full_scan, &all), expected);
+            proptest::prop_assert_eq!(&normalized_rows(&indexed, &all), &expected);
+            proptest::prop_assert_eq!(&normalized_rows(&full_scan, &all), &expected);
         }
 
         let sample_value = model
@@ -608,8 +608,8 @@ proptest::proptest! {
             .iter()
             .map(|(id, value)| (*id, scalar_document(value.clone())))
             .collect();
-        proptest::prop_assert_eq!(normalized_rows(&indexed, &all), expected);
-        proptest::prop_assert_eq!(normalized_rows(&full_scan, &all), expected);
+        proptest::prop_assert_eq!(&normalized_rows(&indexed, &all), &expected);
+        proptest::prop_assert_eq!(&normalized_rows(&full_scan, &all), &expected);
         assert_generated_query_results_match(&indexed, &full_scan, &sample_value)?;
     }
 }
