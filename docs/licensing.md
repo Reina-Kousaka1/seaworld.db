@@ -13,3 +13,7 @@ SeaWorld DB is independent of Tyvera, so its license is selected for SeaWorld's 
 This is a project tradeoff summary, not legal advice. The links above point to official license texts and FAQs.
 
 **Decision: AGPL-3.0, inherited from the selected repository's existing `LICENSE` file.** The full license text is preserved unchanged from the repository's initial commit.
+
+## Engine dependency licenses
+
+The Rust implementation adds [`getrandom` 0.4.3](https://docs.rs/crate/getrandom/0.4.3) under its MIT OR Apache-2.0 dual license. Its locked transitive crates are [`cfg-if` 1.0.5](https://docs.rs/crate/cfg-if/1.0.5) and [`libc` 0.2.191](https://docs.rs/crate/libc/0.2.191), both MIT OR Apache-2.0, and [`r-efi` 6.0.0](https://docs.rs/crate/r-efi/6.0.0), which offers MIT OR Apache-2.0 OR LGPL-2.1-or-later. These are dependencies of the application, not copied code. The exact dependency graph is pinned by `Cargo.lock` and should be rechecked when it changes.

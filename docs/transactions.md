@@ -2,9 +2,9 @@
 
 ## Current guarantees
 
-The initial engine is append-only. Each mutation is represented by one checksummed operation block, appended in sequence, and followed by `FileChannel.force(true)`. The in-memory state changes only after that call succeeds. On reopen, verified operation blocks are replayed to rebuild collections and the primary-ID map.
+The Rust engine is append-only. Each mutation is represented by one checksummed operation block, appended in sequence, and followed by `File::sync_all()`. The in-memory state changes only after that call succeeds. On reopen, verified operation blocks are replayed to rebuild collections and the primary-ID map. Subprocess tests terminate a writer at controlled append and sync points; these tests exercise process-crash recovery, not machine power-loss behavior.
 
-An incomplete final block is discarded with an explicit recovery report. A complete block with invalid checksum or invalid semantics fails open. A force failure has an ambiguous outcome: a complete block may exist even though the caller received an error. Callers must close and reopen after an append error before retrying. The current handle rejects further operations after such an error.
+An incomplete final block is discarded with an explicit recovery report. A complete block with invalid checksum or invalid semantics fails open. A `sync_all` failure has an ambiguous outcome: a complete block may exist even though the caller received an error. Callers must close and reopen after an append error before retrying. The current handle rejects further operations after such an error.
 
 ## Not provided yet
 
@@ -25,4 +25,4 @@ Before claiming transaction guarantees, specify and test:
 7. force ordering and directory-entry durability for create/rename/checkpoint operations;
 8. crash-injection points around write, force, commit, checkpoint, and reopen.
 
-Crash tests must kill a separate process at controlled write stages. Clean shutdown tests alone are not evidence of crash recovery.
+The current subprocess harness covers process exit before append, during a partial block, after a full write before sync, and after sync before the operation returns. It does not simulate power loss, storage-controller cache loss, or all filesystem failure modes.

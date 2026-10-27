@@ -1,5 +1,5 @@
 # Test layout
 
-The first integration suite is `src/test/java/org/seaworlddb/EngineTests.java` and runs through `scripts/test.ps1`. It covers file creation/validation, collections, document mutations, nested values, primary-ID lookups, malformed files, bounded lengths, path-name rejection, nesting limits, and incomplete-tail recovery.
+The Rust integration suite is `tests/engine.rs`, with subprocess crash tests in `tests/crash_recovery.rs`. `fixtures/java-v1-basic.fixture` is a checked-in database produced by the original Java v1 implementation; Rust opens it and checks that Rust-written records match its Java-generated record bytes. During the migration compatibility window, `src/test/java/org/seaworlddb/EngineTests.java` remains as an independent reference suite.
 
-The current suite simulates a truncated append both with a partial prefix and a complete block prefix whose body is cut off. It does not yet terminate a writer process at real write/force boundaries. Add a subprocess crash harness before making stronger crash-recovery claims or adding multi-operation transactions. Planned failure points are before append, during block write, after write but before force, and after force but before the operation returns.
+The Rust suite also covers clean create/close/reopen, collections, insert/read/update/delete, nested values, bounds, malformed headers/records, duplicate IDs, CRC32C, exclusive locking, and repeatable recovery. A parent test process kills the separate crash writer at the four boundaries listed in `docs/storage-format.md`.

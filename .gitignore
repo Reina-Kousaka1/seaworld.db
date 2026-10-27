@@ -1,6 +1,7 @@
 # Java build output
 /build/
 /out/
+/target/
 *.class
 
 # SeaWorld database files and transient files
@@ -13,3 +14,6 @@
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Workspace-local Rust toolchain used during development
+/.tooling/

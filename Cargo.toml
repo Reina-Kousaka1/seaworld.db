@@ -1,0 +1,18 @@
+[package]
+name = "seaworld-db"
+version = "0.0.1-dev"
+edition = "2024"
+rust-version = "1.89"
+license = "AGPL-3.0-only"
+description = "Experimental embedded document database engine"
+
+[dependencies]
+getrandom = "0.4.3"
+
+[features]
+crash-test = []
+
+[[bin]]
+name = "crash_writer"
+path = "src/bin/crash_writer.rs"
+required-features = ["crash-test"]

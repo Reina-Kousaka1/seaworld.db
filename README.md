@@ -4,13 +4,13 @@
 
 SeaWorld DB is a standalone project. It is not part of Tyvera, has no Tyvera runtime dependency, and is intended to serve applications written in Java, Python, JavaScript/TypeScript, Tyvera, and other languages through future connectors.
 
-The engine is being built around its own document model, query representation, index and transaction layers, and `*.seaworld.db` file format. SQL is planned as an adapter over the same query engine. The project does not wrap or forward operations to SQLite, PostgreSQL, MongoDB, H2, or Apache Derby, and it copies no code from those projects.
+The engine is being built in Rust around its own document model, query representation, index and transaction layers, and `*.seaworld.db` file format. SQL is planned as an adapter over the same query engine. The project does not wrap or forward operations to SQLite, PostgreSQL, MongoDB, H2, or Apache Derby, and it copies no code from those projects.
 
 ## Status
 
 Current development version: `0.0.1-dev`.
 
-The initial milestone is a small embedded engine that writes its own versioned database file, persists collections and documents, and reads them after close and reopen. See [the roadmap](docs/roadmap.md) for implemented and planned work.
+The initial milestone is a small embedded engine that writes its own versioned database file, persists collections and documents, and reads them after close and reopen. Rust reads and writes the version 1 format; a checked-in Java-generated fixture and byte comparison protect compatibility with the original implementation. See [the roadmap](docs/roadmap.md) for implemented and planned work.
 
 SeaWorld DB does not claim production readiness, full ACID compliance, a complete SQL implementation, distribution, or production security. Crash recovery and durability guarantees are limited to the documented behavior and tested environments.
 
@@ -20,13 +20,16 @@ Applications will use either a native SeaWorld API or a SQL compatibility layer.
 
 ## Build
 
-The project targets JDK 21 and uses only the Java standard library. From the repository root, run:
+The core targets stable Rust 1.89 or later. From the repository root, run:
 
-```powershell
-./scripts/test.ps1
+```sh
+cargo fmt --all -- --check
+cargo clippy --all-targets --features crash-test -- -D warnings
+cargo test --all-targets --features crash-test
+cargo build --release
 ```
 
-The initial test runner compiles with warnings treated as errors and runs a dependency-free test suite. CI is configured to run the same command on Windows and Linux.
+The only direct runtime dependency is `getrandom`, used to create the non-secret database UUID from the operating system random source. Dependency versions are locked in `Cargo.lock`. CI runs formatting, Clippy, tests, and a release build on Linux and Windows; it also runs the original Java suite during the migration compatibility window.
 
 ## Data files
 

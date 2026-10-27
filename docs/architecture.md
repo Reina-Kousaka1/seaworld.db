@@ -6,9 +6,9 @@ SeaWorld DB is an independent database experiment. Its engine has no Tyvera depe
 
 The first release is embedded-first: an application opens a local `*.seaworld.db` file through a SeaWorld library. A future server may host the same engine behind a network protocol. Replication, clustering, and distributed storage are outside the current scope.
 
-## Language decision: Java 21
+## Language decision: Rust stable
 
-The core is implemented in Java 21 using only the JDK. This is a deliberate choice for this small, portable, embedded-first foundation, not a commitment that every future driver must use Java.
+The engine core is implemented in stable Rust. `Cargo.toml` declares Rust 1.89 as its minimum version. Rust is the engine implementation language; future drivers can target Java, Python, JavaScript/TypeScript, Tyvera, and other hosts without changing that boundary.
 
 | Area | C++ | Rust | Java 21 |
 | --- | --- | --- | --- |
@@ -24,7 +24,9 @@ The core is implemented in Java 21 using only the JDK. This is a deliberate choi
 | Crash recovery | Language does not supply database recovery; storage protocol and OS flush semantics determine it. | Same: the engine must design and test its recovery protocol. | Same: `FileChannel.force` is available, but the engine still must design and test recovery. |
 | Maintenance | Large ecosystem and long history; manual memory hazards need rigorous review. | Strong safety defaults; steeper learning curve and a smaller pool of database-specific experience. | Familiar, mature ecosystem and easy access to JDK file/network APIs; memory footprint is the main embedded tradeoff. |
 
-Rust's ownership model and native library boundary make it the strongest alternative for a low-level, multi-language engine. C++ offers comparable control with more manual safety risk. Java is selected because an installed JDK 21 makes the first real file format and its tests immediately verifiable, and because its embedded library and future server can share one implementation without third-party runtime dependencies. This keeps Phase 0 focused on correctness and file-format behavior. If measured memory use, startup time, or native integration later makes the JVM unsuitable, revisit the language before stabilizing the file format. This choice is independent of Tyvera.
+Rust is selected for the engine core because SeaWorld is intended to be a native embedded library usable from multiple host languages. Ownership and borrowing reduce memory-safety and data-race risks at compile time, while the standard file APIs support explicit synchronization and the language has no mandatory garbage-collected runtime. C++ offers similar native control but leaves more lifetime and bounds safety to conventions. Java remains a strong portable embedded/server option and was useful as the first reference implementation; its JVM footprint and native-embedding boundary are less aligned with this engine's multi-language library goal. This is an architectural choice, not a performance claim: SeaWorld has no benchmark results. The selection is independent of Tyvera, and any future foreign-language ABI should use a deliberate stable C boundary rather than Rust's native ABI.
+
+The production crate has one direct runtime dependency: [`getrandom` 0.4.3](https://docs.rs/crate/getrandom/0.4.3), which asks the operating system for random bytes used only for the database UUID (the UUID is not a secret). Its license is MIT OR Apache-2.0. Its locked transitive dependencies are [`cfg-if` 1.0.5](https://docs.rs/crate/cfg-if/1.0.5), [`libc` 0.2.191](https://docs.rs/crate/libc/0.2.191), and [`r-efi` 6.0.0](https://docs.rs/crate/r-efi/6.0.0); the first two offer MIT OR Apache-2.0, while `r-efi` offers MIT OR Apache-2.0 OR LGPL-2.1-or-later. CRC32C is implemented in the format module to avoid a second runtime dependency. The exact resolved versions are recorded in `Cargo.lock`.
 
 The comparison relies on the [Rust ownership](https://doc.rust-lang.org/book/ch04-00-understanding-ownership.html), [Rust concurrency](https://doc.rust-lang.org/book/ch16-00-concurrency.html), [Rust file API](https://doc.rust-lang.org/std/fs/struct.File.html), [Rust target support](https://doc.rust-lang.org/rustc/platform-support.html), [Rust C ABI](https://doc.rust-lang.org/reference/items/external-blocks.html), [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/), and Java 21 [NIO](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/nio/channels/package-summary.html), [FileChannel](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/nio/channels/FileChannel.html), and [networking](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/net/package-summary.html) documentation. These documents describe language capabilities; the performance and maintenance judgments above are engineering assessments, not benchmark results.
 
@@ -48,11 +50,11 @@ Application
                      *.seaworld.db
 ```
 
-The query engine consumes SeaWorld's own query representation. Adapters translate native API calls or the supported SQL subset into that representation. They do not implement independent storage paths.
+The query engine will consume SeaWorld's own query representation. Adapters translate native API calls or the supported SQL subset into that representation. They do not implement independent storage paths. The current Rust API provides document and collection operations, not the planned filter AST or SQL parser.
 
 ## Modules
 
-- **Storage engine:** owns file creation/opening, the versioned header, append-only record blocks, checksums, bounded reads, durability calls, and recovery of an incomplete tail.
+- **Storage engine:** owns file creation/opening, the versioned header, append-only record blocks, checksums, bounded reads, `File::sync_all` durability calls, exclusive OS file locks, and recovery of an incomplete tail.
 - **Document model:** defines null, boolean, signed 64-bit integer, finite floating point, UTF-8 string, binary, array, and object values. Nested objects and arrays are ordinary values, not a SQL-only feature.
 - **Collections:** group documents and persist collection metadata. Document IDs are stable, positive 64-bit identifiers within a database.
 - **Index engine:** the first in-memory primary ID map is rebuilt by replaying the file. Single-field and unique indexes are future work.
@@ -63,7 +65,7 @@ The query engine consumes SeaWorld's own query representation. Adapters translat
 
 ## Concurrency and ownership
 
-The first implementation serializes mutations within a database handle and takes an exclusive OS file lock so cooperating SeaWorld handles do not write the same file concurrently. File locks may be advisory; another program that ignores the lock can still modify the file. The engine does not offer concurrent readers, MVCC, or isolation levels. A future server can own one engine handle and schedule requests over a protocol without moving network concerns into storage code.
+Rust's exclusive handle requires mutable access for writes, serializing mutations through that handle, and takes an exclusive OS file lock so cooperating SeaWorld handles do not write the same file concurrently. Lock enforcement is platform-dependent; another program may still modify the file outside SeaWorld's locking protocol. The engine does not offer concurrent readers, MVCC, or isolation levels. A future server can own one engine handle and schedule requests over a protocol without moving network concerns into storage code.
 
 ## Integrity and trust boundaries
 

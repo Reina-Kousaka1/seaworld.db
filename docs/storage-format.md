@@ -19,7 +19,7 @@ The fixed header is 64 bytes:
 | 40 | 20 | Reserved | Must be zero in version 1 |
 | 60 | 4 | Header checksum | CRC32C over bytes 0 through 59 |
 
-The header is written and forced before a newly created database handle is returned. Wrong magic, version, header length, reserved bytes, flags, or checksum produces a format/integrity error; the engine does not guess a version.
+The header is written and synchronized before a newly created database handle is returned. Wrong magic, version, header length, reserved bytes, flags, or checksum produces a format/integrity error; the engine does not guess a version.
 
 ## Record blocks
 
@@ -44,9 +44,11 @@ The `block size` field establishes a storage sizing unit for this early format. 
 
 CRC32C detects accidental damage to the header and each complete record. It is not a cryptographic integrity mechanism. A complete record with a checksum mismatch, an invalid sequence, or invalid operation semantics fails open and is never silently skipped.
 
-If the final block prefix or declared block is cut off by end-of-file, open truncates only that incomplete tail to the last verified record boundary and calls `force(true)`. The returned recovery report exposes the number of discarded bytes. A truncated header, a malformed complete prefix, or a complete block with bad checksum is an error. Data in the unfinished final operation may be lost; earlier verified records remain readable. Repeating recovery on the resulting file should discard zero bytes.
+If the final block prefix or declared block is cut off by end-of-file, open truncates only that incomplete tail to the last verified record boundary and calls Rust `File::sync_all()`. The returned recovery report exposes the number of discarded bytes. A truncated header, a malformed complete prefix, or a complete block with bad checksum is an error. Data in the unfinished final operation may be lost; earlier verified records remain readable. Repeating recovery on the resulting file should discard zero bytes.
 
-Each successful mutation appends one complete operation block and calls `FileChannel.force(true)` before updating the in-memory view. This is not a multi-operation transaction. If a process dies after a complete record reaches durable storage but before the caller receives success, the operation may be present after reopen. Device, filesystem, and OS guarantees still need platform-specific crash testing.
+Each successful mutation appends one complete operation block and calls `File::sync_all()` before updating the in-memory view. This is not a multi-operation transaction. If a process dies after a complete record reaches durable storage but before the caller receives success, the operation may be present after reopen. Rust's `sync_all` asks the OS to synchronize file content and metadata, corresponding to the Java reference's `FileChannel.force(true)` at the file level. On Unix, creation also synchronizes the parent directory; the portable Rust standard library has no directory-sync API on Windows. Filesystem, device, and OS guarantees still need platform-specific testing; process-kill tests do not simulate power loss.
+
+The Rust test-only `crash-test` feature enables a separate `crash_writer` process with termination points before a block write, partway through a block, after a complete write but before sync, and after sync but before returning. The feature is disabled in release builds unless explicitly requested.
 
 ## Format evolution
 

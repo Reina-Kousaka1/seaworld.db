@@ -1,3 +1,4 @@
 * text=auto eol=lf
 *.seaworld.db binary
 *.seaworld.db-* binary
+tests/fixtures/*.fixture binary
