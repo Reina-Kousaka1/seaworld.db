@@ -118,7 +118,7 @@ fn create_database_writes_a_valid_64_byte_header() {
     assert_eq!(fs::metadata(&temp.path).unwrap().len(), 64);
     assert_eq!(&fs::read(&temp.path).unwrap()[..8], b"SWDB\r\n\x1a\n");
     assert_ne!(database_id, [0; 16]);
-    assert_eq!(fs::read(&temp.path).unwrap()[8..10], 3_u16.to_be_bytes());
+    assert_eq!(fs::read(&temp.path).unwrap()[8..10], 4_u16.to_be_bytes());
 }
 
 #[test]
