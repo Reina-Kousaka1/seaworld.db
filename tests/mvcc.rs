@@ -471,3 +471,29 @@ fn seeded_mutations_keep_indexed_queries_equal_to_full_scan_before_and_after_reo
     let full_scan = Database::open(&full_scan_file.0).unwrap();
     assert_index_matches_full_scan(&indexed, &full_scan, seed);
 }
+
+#[test]
+fn deterministic_malformed_record_tails_do_not_panic_during_open() {
+    const INITIAL_SEED: u64 = 0xc0ff_eec7_u64;
+    let mut seed = INITIAL_SEED;
+
+    for case in 0..64 {
+        let temp = TempDatabase::new();
+        Database::create(&temp.0).unwrap().close().unwrap();
+        let mut bytes = fs::read(&temp.0).unwrap();
+        let tail_length = (next_seed(&mut seed) % 128 + 1) as usize;
+        for _ in 0..tail_length {
+            bytes.push(next_seed(&mut seed) as u8);
+        }
+        fs::write(&temp.0, bytes).unwrap();
+
+        let result = std::panic::catch_unwind(|| Database::open(&temp.0));
+        assert!(
+            result.is_ok(),
+            "open panicked for malformed tail case {case}, initial seed {INITIAL_SEED:#x}, state {seed:#x}"
+        );
+        if let Ok(database) = result.unwrap() {
+            database.close().unwrap();
+        }
+    }
+}
