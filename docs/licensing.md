@@ -12,8 +12,8 @@ SeaWorld DB is independent of Tyvera, so its license is selected for SeaWorld's 
 
 This is a project tradeoff summary, not legal advice. The links above point to official license texts and FAQs.
 
-**Decision: AGPL-3.0, inherited from the selected repository's existing `LICENSE` file.** The full license text is preserved unchanged from the repository's initial commit.
+**Decision: AGPL-3.0-only, inherited from the selected repository's existing `LICENSE` file.** `Cargo.toml`, README, and source SPDX headers use `AGPL-3.0-only`. The full GNU AGPL version 3 text remains in `LICENSE`; this does not grant later AGPL versions.
 
 ## Engine dependency licenses
 
-The Rust implementation adds [`getrandom` 0.4.3](https://docs.rs/crate/getrandom/0.4.3) under its MIT OR Apache-2.0 dual license. Its locked transitive crates are [`cfg-if` 1.0.5](https://docs.rs/crate/cfg-if/1.0.5) and [`libc` 0.2.191](https://docs.rs/crate/libc/0.2.191), both MIT OR Apache-2.0, and [`r-efi` 6.0.0](https://docs.rs/crate/r-efi/6.0.0), which offers MIT OR Apache-2.0 OR LGPL-2.1-or-later. These are dependencies of the application, not copied code. The exact dependency graph is pinned by `Cargo.lock` and should be rechecked when it changes.
+The only direct runtime dependency is [`getrandom` 0.4.3](https://docs.rs/crate/getrandom/0.4.3), MIT OR Apache-2.0. `proptest` 1.12.0 is test-only, licensed MIT OR Apache-2.0, declares Rust 1.88 support (below SeaWorld's Rust 1.89 MSRV), and has recent upstream release/maintenance activity. It was added for generated, shrinkable B+Tree mutation sequences; default fork/timeout features are disabled to reduce dependency surface. The exact locked registry packages and licenses are listed in [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) and pinned by `Cargo.lock`. Recheck the graph and MSRV before dependency updates.

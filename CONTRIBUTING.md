@@ -1,15 +1,16 @@
 # Contributing
 
-SeaWorld DB is experimental database-engine work. Contributions should preserve the independent storage and query architecture and must not add a hidden SQLite, PostgreSQL, MongoDB, H2, or Derby storage dependency.
+SeaWorld DB is experimental database-engine work. Contributions must preserve the project's independent document-native architecture and must not add a hidden SQLite, PostgreSQL, MongoDB, H2, or Derby storage dependency.
 
 Before submitting a change:
 
 1. Read the relevant architecture document and state which invariant the change preserves.
-2. Keep file-format changes versioned and document migration or rejection behavior.
-3. Add focused tests for persistence, malformed input, and boundary conditions where applicable.
-4. Run `cargo fmt --all -- --check`, `cargo clippy --all-targets --features crash-test -- -D warnings`, and `cargo test --all-targets --features crash-test`.
-5. List new dependencies and their licenses in the change description. Keep dependencies limited to a clear, documented engine need.
+2. Keep file-format changes versioned and document migration and rejection behavior.
+3. Add focused tests for persistence, malformed input, recovery, and boundaries where applicable. Keep generated property-test failures reproducible and preserve minimized regression cases.
+4. Run `cargo fmt --all -- --check`, `cargo clippy --all-targets --features crash-test --locked -- -D warnings`, and `cargo test --all-targets --features crash-test --locked`.
+5. List new dependencies, their maintenance/MSRV, and their licenses. Keep runtime dependencies limited to documented engine needs.
+6. Do not claim ACID, crash-safety, or performance properties beyond the behaviors tested and documented.
 
-Do not claim ACID, crash-safety, or performance properties without tests that demonstrate them. Do not add secrets, production database files, or unrelated runtime integrations.
+Contributions are submitted under **AGPL-3.0-only**, the license stated in `LICENSE` and `Cargo.toml`. By submitting a contribution, the contributor agrees that it may be distributed under those project terms. There is no CLA and no signed-off-by/DCO requirement at this time. Do not include code or copied text from other database engines; record provenance for any externally sourced documentation or assets.
 
-The repository is licensed under AGPL-3.0 as stated in `LICENSE`. Contributions must be submitted under terms compatible with that license. No separate contributor agreement is currently defined.
+Do not add secrets, production database files, telemetry, or unrelated runtime integrations.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 use std::collections::BTreeMap;
 
 /// Maximum encoded document size in SeaWorld format version 1.
@@ -53,6 +54,10 @@ impl Document {
     /// Returns the document fields in deterministic key order.
     pub fn fields(&self) -> &BTreeMap<String, Value> {
         &self.fields
+    }
+
+    pub(crate) fn fields_mut_for_sql(&mut self) -> &mut BTreeMap<String, Value> {
+        &mut self.fields
     }
 
     /// Returns the value for a top-level field, if it exists.

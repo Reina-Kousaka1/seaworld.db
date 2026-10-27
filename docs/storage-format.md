@@ -1,8 +1,8 @@
-# Storage formats: versions 1, 2, and 3
+# Storage formats: versions 1, 2, 3, and 4
 
 This document describes the first SeaWorld file format. It is a custom format, not a serialization dump of Java objects. Integer widths, byte order, lengths, tags, and checksums are encoded explicitly. A version change or incompatible feature requires a version bump or a documented feature flag.
 
-The filename convention is `*.seaworld.db`. The current implementation uses a single file whose source of truth is an append-only sequence of operation blocks. It does not embed SQLite, PostgreSQL, MongoDB, H2, or Derby.
+The filename convention is `*.seaworld.db`. The current implementation uses a single file whose source of truth is an append-only sequence of checksummed operation records, including immutable V4 B+Tree page records. It does not embed SQLite, PostgreSQL, MongoDB, H2, or Derby.
 
 ## Header
 
@@ -52,11 +52,21 @@ On recovery, only a complete, semantically valid transaction with a matching com
 
 ## Version 3 commit watermark
 
-V3 keeps the V2 header and transaction record grammar and stores version `3` at offset 8. New `Database::create` files use V3. V3 accepts the same transaction, index-definition, and document-ID watermark records as V2, plus record kind 9, `VERSION_WATERMARK(committed_version)`. A watermark is a positive signed 64-bit version, appears outside a transaction, cannot move the commit version backwards, and reserves the next transaction ID after the watermark. It is written by V3 compaction so rebuilding a log cannot reuse old snapshot versions. V1 and V2 readers reject a V3 header before replay.
+V3 keeps the V2 header and transaction record grammar and stores version `3` at offset 8. `Database::create_v3` explicitly creates V3. V3 accepts the same transaction, index-definition, and document-ID watermark records as V2, plus record kind 9, `VERSION_WATERMARK(committed_version)`. A watermark is a positive signed 64-bit version, appears outside a transaction, cannot move the commit version backwards, and reserves the next transaction ID after the watermark. It is written by V3 compaction so rebuilding a log cannot reuse old snapshot versions. V1 and V2 readers reject a V3 header before replay.
 
 V3 transaction IDs are also the commit-version numbers during normal operation. A successful transaction advances the visible version only after its commit marker is synchronized and applied. Rollback and discarded incomplete transactions do not advance it. V3 compaction can advance the watermark when its snapshot rewrite requires more transactions than the source, but never moves it backwards. `CommitVersion` is separate from `DocumentId` in the public API.
 
 Index-definition records remain standalone records outside transactions. Their ordered entries are rebuilt from committed documents on reopen. V3 does not yet persist index-entry deltas or B+Tree pages.
+
+## Version 4 persistent index pages
+
+V4 keeps the V3 header, transaction grammar, version watermark, and V1-V3 replay compatibility. New `Database::create` files use version `4`. Record kind 10 is `INDEX_PAGE`; kind 11 is `INDEX_ROOT`. Index creation appends standalone page records and then a standalone index-definition record that includes its root page ID and generation. Page records have a per-page checksum in addition to the enclosing record checksum.
+
+A V4 page payload is exactly 4,096 explicitly encoded bytes: `SWIP` magic; page version; leaf/internal page type; zero flags; page ID; index ID; generation; key count; payload length; zero reserved bytes; encoded payload; zero padding; and CRC32C in the final four bytes. Leaf entries store typed scalar keys and positive document IDs. Internal entries store child page IDs and typed separator keys. Page IDs and references are bounded; no Rust struct layout is written directly to disk. See [persistent index storage](index-storage.md) for validation and ordering rules.
+
+Within a V4 transaction, each kind-10 record carries the transaction ID plus one page, and each kind-11 record carries the transaction ID, index ID, new root ID, and generation. The batch order is begin, document mutations, COW pages, root publications, commit. Recovery publishes none of an incomplete batch. The matching commit marker publishes documents and roots together. Pages written without a root (for example after an index-create interruption) remain unreachable. Old COW pages are also retained until compaction.
+
+V4 replay loads index leaf entries from persisted roots and verifies that every referenced document and key is consistent. V2/V3 index entries continue to rebuild from committed documents. V4 does not add a page free-list or immediate page reclamation. `write_v4_compacted_copy` builds fresh pages in a non-overwriting compacted copy and preserves the MVCC version watermark.
 
 ## Checksums and recovery
 
@@ -66,11 +76,11 @@ If the final block prefix or declared block is cut off by end-of-file, a writabl
 
 V1 mutations append one operation block and call `File::sync_all()` before updating the in-memory view. V2 commits append a contiguous begin/mutation/commit batch and synchronize it before updating memory. If a process dies after a complete V2 commit marker reaches the file but before the caller receives success, the transaction may be present after reopen. Rust's `sync_all` asks the OS to synchronize file content and metadata, corresponding to the Java reference's `FileChannel.force(true)` at the file level. On Unix, creation also synchronizes the parent directory; the portable Rust standard library has no directory-sync API on Windows. Filesystem, device, and OS guarantees still need platform-specific testing; process-kill tests do not simulate power loss.
 
-The Rust test-only `crash-test` feature enables a separate `crash_writer` process with termination points before and during V1-compatible appends, at V2 transaction boundaries, and during suffix recovery. The feature is disabled in release builds unless explicitly requested.
+The Rust test-only `crash-test` feature enables a separate `crash_writer` process with termination points before and during legacy appends, V2/V3/V4 transaction boundaries, V4 page writes and root publication, and suffix recovery. The feature is disabled in release builds unless explicitly requested. Process-kill tests do not simulate an OS crash, power loss, or storage-device cache failure.
 
 ## Compacted copies
 
-`write_compacted_copy` writes a new file in the source version. For V2/V3 sources it retains committed live documents, index definitions, and the document-ID high-water mark; for V1 sources it preserves the legacy V1 grammar. `write_v2_compacted_copy` writes V2 from any source, and `write_v3_compacted_copy` writes V3 and its commit watermark. V3 compaction is rejected while snapshots are active. Compaction preserves the database UUID and live collection/document IDs, and starts a fresh record sequence. The open source remains unchanged. The engine writes and synchronizes a same-directory temporary file, then publishes it through a no-overwrite hard link and synchronizes the directory where supported. The destination filesystem must support hard links. There is no in-place replacement or automatic path switch; the caller explicitly opens the new file and decides when to retire the old one.
+`write_compacted_copy` writes a new file in the source version. For V2-V4 sources it retains committed live documents, index definitions, and the document-ID high-water mark; for V1 sources it preserves the legacy V1 grammar. `write_v2_compacted_copy`, `write_v3_compacted_copy`, and `write_v4_compacted_copy` explicitly select a target version. V3/V4 compaction is rejected while snapshots are active. V4 compaction rebuilds current B+Tree roots, dropping obsolete pages from the destination. Compaction preserves the database UUID and live collection/document IDs and starts a fresh record sequence. The open source remains unchanged. The engine writes and synchronizes a same-directory temporary file, then publishes it through a no-overwrite hard link and synchronizes the directory where supported. The destination filesystem must support hard links. There is no in-place replacement or automatic path switch; the caller explicitly opens the new file and decides when to retire the old one.
 
 ## Format evolution
 

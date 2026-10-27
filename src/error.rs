@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 use std::{fmt, io};
 
 /// Errors returned by SeaWorld's parser, storage, and database API.

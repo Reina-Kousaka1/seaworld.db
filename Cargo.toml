@@ -9,6 +9,9 @@ description = "Experimental embedded document database engine"
 [dependencies]
 getrandom = "0.4.3"
 
+[dev-dependencies]
+proptest = { version = "1.12.0", default-features = false, features = ["std"] }
+
 [features]
 crash-test = []
 
@@ -16,3 +19,7 @@ crash-test = []
 name = "crash_writer"
 path = "src/bin/crash_writer.rs"
 required-features = ["crash-test"]
+
+[[bin]]
+name = "seaworld"
+path = "src/bin/seaworld.rs"

@@ -1,32 +1,38 @@
-# Persistent index storage decision
+# Persistent index storage
 
-## Current implementation: durable definitions, rebuilt entries
+## V4 implementation
 
-V2 and V3 persist index definitions in the SeaWorld append log. Index entries live in an ordered in-memory BTreeMap and are rebuilt from committed documents on reopen. Document transactions update the in-memory entries after the transaction's commit marker is synchronized. Unique indexes are checked against the staged transaction view. This keeps the current-state query engine correct after reopen, but index contents themselves are not persisted as records or pages and rebuild cost grows with the collection.
+Format V4 stores immutable 4 KiB B+Tree pages in the same checksummed append-only SeaWorld file as collections and documents. V1, V2, and V3 remain readable. `Database::create` creates V4; explicit V1/V2/V3 constructors are compatibility tools. V2/V3 indexes continue to rebuild their in-memory entries from documents.
 
-Index-entry deltas in the same transaction log remain a candidate for the next engine wave. If implemented, replay must validate their exact relationship to document mutations before publishing a commit. Today, document data is the source of truth and replay rebuilds each index from it.
+The tree key is `(typed IndexValue, DocumentId)`. The order is `Null < Bool < Int64 < finite Float64 < UTF-8 String`, comparing only like types. Missing fields have no index entry; explicit `null` has one. Float keys treat `-0.0` and `+0.0` as equal. A string index key is limited to 1,024 UTF-8 bytes. Each index is a single-field index; compound, text, and array-element indexes are not implemented.
 
-The ordered in-memory index supports equality and range candidate lookup. Index candidates are still checked against the complete filter. Sorting currently sorts query results; it does not stream directly from an index.
+A page is explicitly encoded, never a raw Rust layout:
 
-## File strategy for a future persistent tree
+| Offset | Bytes | Meaning |
+| ---: | ---: | --- |
+| 0 | 4 | `SWIP` magic |
+| 4 | 1 | Page version (`1`) |
+| 5 | 1 | Page type (`1` leaf, `2` internal) |
+| 6 | 2 | Required-zero flags |
+| 8 | 8 | Positive page ID, big-endian |
+| 16 | 8 | Positive index ID |
+| 24 | 8 | Non-negative transaction generation |
+| 32 | 2 | Key/separator count |
+| 34 | 2 | Payload byte count |
+| 36 | 4 | Reserved zero bytes |
+| 40 | 4,052 max | Explicit key/child encoding followed by zero padding |
+| 4,092 | 4 | CRC32C over bytes 0 through 4,091 |
 
-The selected direction is **A: store index pages in the same database file**. Persistent pages are not implemented yet. This keeps document commits, index-root publication, checksums, and recovery in one append-only file. A future writer would append copy-on-write pages, then publish the new roots in the transaction's commit record; recovery would expose only roots named by committed transactions. Uncommitted or superseded pages would remain unreachable until compaction.
+Leaf payloads contain ordered typed keys and positive document IDs. Internal payloads contain the first child ID, followed by ordered separator keys and right-child IDs. A child reference must be a positive bounded ID and resolve when traversed from a root. Tree validation checks page checksum, identity, generation, page type, key count, payload bounds, strict ordering, child ranges, cycles/shared children, and a maximum height of 32. CRC32C detects accidental damage, not malicious modification.
 
-This choice avoids a two-file commit protocol: with index sidecars, a crash could leave the document log and index file at different generations, and correct recovery would need generation checks plus deterministic rebuild or coordinated replacement. A single file also avoids a second data-file lock and cross-platform sidecar replacement rules on Windows and Linux. Compaction can construct and atomically publish one compacted database copy. The tradeoff is that append-only index pages consume the same file-size budget until compaction, and a future page format will need a new format version, likely V4, while keeping V1–V3 readable.
+Page records are log records containing exactly one page. Index creation appends and synchronizes pages first, then publishes an index definition with the root page and generation. If publication is absent after a crash, those pages are unreachable and harmless. Document transactions append COW pages and root-publication records inside the same `TX_BEGIN` / `TX_COMMIT` batch as the document changes. Recovery applies neither pages nor roots from an uncommitted batch. A complete commit exposes the new documents and roots together; a torn or uncommitted suffix is discarded from the begin record.
 
-This is an architecture decision for the next storage-format step, not a claim that current secondary entries are persistent or transactionally stored.
+A COW update clones only the affected search paths and splits full leaves/internal nodes. Old pages remain immutable. The log can therefore contain unreachable old and intermediate pages; they are retained until V4 compaction writes a compact copy. This design prioritizes one-file root publication over immediate page reclamation. Page IDs are monotonic within a file and bounded to 32,768 pages; database and transaction byte limits may be reached earlier.
 
-## Persistent B+Tree page design candidate
+On V4 reopen, SeaWorld loads the page records and traverses the persisted roots to repopulate the in-memory ordered index map. It does not rebuild index entries by scanning every document. Each loaded entry is checked against its referenced live document. Query execution still rechecks all candidates against the full filter. V4 compaction builds fresh roots from the current live state and preserves the commit watermark; active snapshots cause compaction to be rejected. The embedded API exposes `Database::indexes()` and `Database::check_integrity()`; the `seaworld` shell/CLI also provides read-only checking and index metadata inspection.
 
-The append log makes index changes durable but does not yet provide a page allocator or on-disk B+Tree. The next storage-format revision should use a copy-on-write B+Tree whose root is published by a committed log record. A proposed page is 4,096 bytes with a fixed header: `SWIP` magic, page-format version, page type, flags, page ID, key count, payload length, and CRC32C. Remaining bytes are zero-filled reserved space except for the CRC trailer.
+## Recovery and boundaries
 
-- **Leaf pages:** sorted `(IndexValue, DocumentId)` entries, collection/index identity, and optional validated left/right sibling IDs for range scans.
-- **Internal pages:** a first child ID followed by sorted separator-entry/child-ID pairs. Separators use the same typed ordering as the query/index layer.
-- **Root metadata:** an index catalog maps each `IndexId` to its collection, normalized field path, unique flag, root page ID, and generation. A transaction writes new pages first and commits root changes in the append log; uncommitted pages are unreachable and reclaimable by a later compaction.
-- **Validation:** bound page count, key count, B+Tree height (32), payload lengths, child IDs, sibling IDs, key ordering, database UUID, and generation before allocation or traversal. Reject cycles and invalid references. Page CRC32C detects accidental damage; it is not cryptographic authentication.
+The commit marker is the logical publication point; `File::sync_all()` is the success boundary reported by the API. Process-kill tests cover termination before/during page writes, after pages but before root publication, during root publication, after roots but before commit, and existing commit/sync boundaries. These tests do not prove power-loss guarantees or device flush behavior. V4 is experimental and does not claim full ACID or production durability.
 
-The page tree is a design target, not an implemented feature. Adding it requires an explicit new file-format version and golden fixtures; V1, V2, and V3 must remain readable. No in-memory Rust container layout is written directly to disk.
-
-## Query semantics
-
-The ordered comparison domain is `Null < Bool < Int64 < finite Float64 < UTF-8 String`, with comparison only within compatible value types. Missing values have no index entry; explicit null does. Float keys treat negative and positive zero as equal. Compound, text, geospatial, and array-element indexes remain out of scope.
+`Database::check_integrity()` rechecks live document/primary-index consistency, secondary-index contents, reachable B+Tree ordering, and the checksums and identities of retained pages without repairing the source. It intentionally permits unreachable old copy-on-write pages because those remain in the append-only log until compaction. It reports their total retained page count rather than treating valid historical pages as corruption. `Database::backup()` writes a consistent, compacted V4 copy to a new destination, while `Database::restore_backup()` validates a source read-only and also requires a new destination; neither overwrites an existing file. The `seaworld check`, `seaworld backup`, and `seaworld restore` commands expose these library operations.

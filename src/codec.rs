@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 use std::collections::BTreeMap;
 
 use crate::{Document, Error, Result, Value, document::MAX_DOCUMENT_BYTES};

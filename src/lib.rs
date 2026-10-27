@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+#![forbid(unsafe_code)]
 //! Experimental embedded SeaWorld DB engine.
 //!
 //! The public API and the planned SQL adapter share one document-native engine. The
-//! V1/V2 files remain readable; new databases use V3 transaction records.
+//! V1/V2/V3 files remain readable; new databases use V4 persistent index pages.
 
+mod btree;
 mod codec;
 mod document;
 mod error;
@@ -10,6 +13,7 @@ mod format;
 mod index;
 mod mvcc;
 mod query;
+mod sql;
 mod storage;
 
 pub use document::{Document, MAX_DOCUMENT_BYTES, Value};
@@ -22,8 +26,10 @@ pub use query::{
     CompareOp, Filter, MAX_FILTER_DEPTH, MAX_FILTER_NODES, MAX_QUERY_RESULTS, Query, QueryPlan,
     QueryRow, SortDirection,
 };
+pub use sql::{MAX_SQL_BYTES, MAX_SQL_TOKENS, SqlResult, SqlRow};
 pub use storage::{
-    Database, MAX_COLLECTIONS, MAX_DATABASE_BYTES, MAX_DOCUMENTS, RecoveryReport, Transaction,
+    Database, IndexInfo, IntegrityReport, MAX_COLLECTIONS, MAX_DATABASE_BYTES, MAX_DOCUMENTS,
+    RecoveryReport, Transaction,
 };
 
 /// A stable, positive identifier assigned to a document within a database.

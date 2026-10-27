@@ -18,9 +18,9 @@ Results are deterministic: absent an explicit sort, rows are in ascending docume
 
 Index and scan paths are compared in differential tests. A query result must not depend on whether a secondary index exists.
 
-## SQL subset (future)
+## SQL V0 subset
 
-The intended starting subset is collection creation, simple `SELECT`, `INSERT`, `UPDATE`, and `DELETE`, with field paths and basic predicates. This is not a promise of full SQL compatibility. Parser output is converted to the internal query model; SQL is never sent to another database.
+The current starting subset implements collection creation, simple `SELECT`, `INSERT`, `UPDATE`, and `DELETE`, with field paths and one comparison predicate. `EXPLAIN SELECT` returns the shared native plan. The parser output is converted to the internal query model; SQL is never sent to another database. See [SQL V0](sql.md) for grammar, binding, and value semantics. This is not a promise of full SQL compatibility.
 
 Document-to-SQL semantics must define:
 
@@ -31,4 +31,4 @@ Document-to-SQL semantics must define:
 - identifier quoting and reserved words;
 - comparison/collation and numeric coercion rules.
 
-Until those rules and an executable parser exist, SQL support is not implemented.
+The implemented SQL rules are deliberately small: missing fields are distinct from null, nested paths traverse objects only, arrays remain values, and comparisons do not coerce across types. Unsupported SQL syntax returns a query error with a source byte offset when available.

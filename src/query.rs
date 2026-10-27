@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 use std::cmp::Ordering;
 
 use crate::{Document, DocumentId, Error, Result, Value, index::FieldPath};
@@ -20,6 +21,8 @@ pub enum CompareOp {
 /// Typed filter expression. It never parses or evaluates a query string.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Filter {
+    /// Matches every document in the selected collection.
+    All,
     IdEq(DocumentId),
     Compare {
         path: FieldPath,
@@ -145,7 +148,7 @@ pub(crate) fn validate_filter(filter: &Filter) -> Result<()> {
                 }
             }
             Filter::Not(child) => visit(child, depth + 1, nodes)?,
-            Filter::IdEq(_) | Filter::Exists { .. } => {}
+            Filter::All | Filter::IdEq(_) | Filter::Exists { .. } => {}
         }
         Ok(())
     }
@@ -155,6 +158,7 @@ pub(crate) fn validate_filter(filter: &Filter) -> Result<()> {
 
 pub(crate) fn matches(filter: &Filter, id: DocumentId, document: &Document) -> bool {
     match filter {
+        Filter::All => true,
         Filter::IdEq(expected) => id == *expected,
         Filter::Compare { path, op, value } => match path.get(document) {
             None => matches!(op, CompareOp::Ne),

@@ -39,17 +39,32 @@ SeaWorld DB is versioned as `0.0.x` while the file format, recovery, and API are
 - [x] Add ordered single-field range candidates and recheck every candidate against the full query filter.
 - [x] Refuse V3 compaction while snapshot leases are active and preserve/advance the version watermark safely.
 - [x] Add deterministic state-model, MVCC, index-range, read-only recovery, and process crash coverage.
-- [ ] Persist index-entry deltas or page-based indexes; index entries are currently rebuilt from documents.
-- [ ] Add a fuzzing harness and broader randomized index/recovery properties.
+- [ ] Add a dedicated libFuzzer harness and broader randomized recovery/input properties.
 - [ ] Verify stress behavior under CI on Linux and Windows before making stability claims.
+
+## Phase 3: persistent indexes and embedded experience
+
+- [x] Introduce V4 with checksummed 4 KiB page images and preserve V1/V2/V3 read compatibility.
+- [x] Use immutable copy-on-write leaf/internal pages with bounded IDs, key sizes, and tree height.
+- [x] Write index pages and root publications in one transaction batch and discard incomplete batches during recovery.
+- [x] Add process-kill hooks around page writes, root publication, and transaction commit boundaries.
+- [x] Add a V4 compacted-copy path that rebuilds live index trees into a non-overwriting destination.
+- [x] Load V4 secondary entries from persisted pages on reopen and compare indexed range results with a full-scan oracle.
+- [x] Add deterministic generated B+Tree mutation sequences with an ordered-set oracle using `proptest`.
+- [x] Expose read-only index metadata and integrity checks; provide consistent non-overwriting backup and restore-to-new-file library APIs.
+- [x] Implement a bounded SQL V0 lexer/parser, document-aware literal values, positional bindings, and SELECT/INSERT/UPDATE/DELETE/CREATE COLLECTION/EXPLAIN SELECT through the native engine.
+- [x] Add a SeaWorld shell, metadata inspector, read-only integrity checker, and non-overwriting backup/restore commands over the embedded APIs.
+- [ ] Add true in-memory storage without temporary persistent files.
+- [ ] Expand security-model, resource-limit, corruption, fuzz, and cross-platform crash coverage.
+- [x] Define current connection/session ownership and future driver/protocol boundaries in docs.
 
 ## Next engine wave
 
 1. Fuzz malformed headers, record streams, transaction state machines, and nested document decoders.
-2. Implement transactional index-entry persistence, then design page/block allocation and its migration path before adding on-disk B+Tree pages.
-3. Expand concurrency and corruption stress coverage for snapshot history limits, lock contention, compaction, and recovery.
-4. Specify and implement a narrow SQL parser adapter over the existing native query AST; keep SQL and native execution on one engine.
-5. Add storage-format golden fixtures for V2/V3 and reproducible benchmarks after correctness and crash recovery are established.
+2. Extend SQL V0 with index DDL and broader prepared-query ergonomics; add migration inspection to the CLI.
+3. Add a true memory backend and test it against the same transaction/query semantics.
+4. Expand concurrency and corruption stress coverage for B+Tree roots, snapshot history, lock contention, compaction, and recovery.
+5. Add fuzz targets and storage-format golden fixtures, then reproducible benchmarks after correctness and crash recovery are established.
 
 ## Explicitly out of scope
 

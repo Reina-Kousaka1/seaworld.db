@@ -1,12 +1,15 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
 };
 
+use crate::codec::Cursor;
 use crate::{Document, DocumentId, Error, Result, Value};
 
 pub const MAX_INDEXES: usize = 1_024;
 pub const MAX_FIELD_PATH_DEPTH: usize = 64;
+pub(crate) const MAX_INDEX_KEY_BYTES: usize = 1_024;
 
 /// Stable database-local identifier for an index definition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -89,6 +92,8 @@ pub(crate) struct SecondaryIndex {
     pub(crate) collection_id: i64,
     pub(crate) path: FieldPath,
     pub(crate) unique: bool,
+    pub(crate) root_page_id: u64,
+    pub(crate) root_generation: u64,
     pub(crate) entries: BTreeMap<IndexValue, BTreeSet<DocumentId>>,
 }
 
@@ -99,6 +104,8 @@ impl SecondaryIndex {
             collection_id,
             path,
             unique,
+            root_page_id: 0,
+            root_generation: 0,
             entries: BTreeMap::new(),
         }
     }
@@ -167,6 +174,65 @@ impl IndexValue {
             Value::Binary(_) => Err(Error::UnsupportedIndexValue("binary".into())),
             Value::Array(_) => Err(Error::UnsupportedIndexValue("array".into())),
             Value::Object(_) => Err(Error::UnsupportedIndexValue("object".into())),
+        }
+    }
+
+    pub(crate) fn encoded_len(&self) -> Result<usize> {
+        match self {
+            Self::Null => Ok(1),
+            Self::Bool(_) => Ok(2),
+            Self::Integer(_) | Self::Float(_) => Ok(9),
+            Self::String(value) if value.len() <= MAX_INDEX_KEY_BYTES => Ok(5 + value.len()),
+            Self::String(_) => Err(Error::Limit(format!(
+                "indexed string key exceeds {MAX_INDEX_KEY_BYTES} bytes"
+            ))),
+        }
+    }
+
+    pub(crate) fn encode(&self, output: &mut Vec<u8>) -> Result<()> {
+        match self {
+            Self::Null => output.push(0),
+            Self::Bool(value) => output.extend_from_slice(&[1, u8::from(*value)]),
+            Self::Integer(value) => {
+                output.push(2);
+                output.extend_from_slice(&value.to_be_bytes());
+            }
+            Self::Float(value) => {
+                output.push(3);
+                output.extend_from_slice(&value.0.to_bits().to_be_bytes());
+            }
+            Self::String(value) => {
+                self.encoded_len()?;
+                let length = i32::try_from(value.len())
+                    .map_err(|_| Error::Limit("index key length overflow".into()))?;
+                output.push(4);
+                output.extend_from_slice(&length.to_be_bytes());
+                output.extend_from_slice(value.as_bytes());
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn decode(input: &mut Cursor<'_>) -> Result<Self> {
+        match input.u8("index key type")? {
+            0 => Ok(Self::Null),
+            1 => match input.u8("index boolean key")? {
+                0 => Ok(Self::Bool(false)),
+                1 => Ok(Self::Bool(true)),
+                _ => Err(Error::Integrity("index boolean key is invalid".into())),
+            },
+            2 => Ok(Self::Integer(input.i64("index integer key")?)),
+            3 => {
+                let value = f64::from_bits(input.i64("index float key")? as u64);
+                if !value.is_finite() {
+                    return Err(Error::Integrity("index float key is not finite".into()));
+                }
+                Ok(Self::Float(FloatKey(value)))
+            }
+            4 => Ok(Self::String(
+                input.string(MAX_INDEX_KEY_BYTES, "index string key")?,
+            )),
+            value => Err(Error::Integrity(format!("unknown index key type {value}"))),
         }
     }
 }

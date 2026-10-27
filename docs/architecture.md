@@ -10,7 +10,7 @@ The first release is embedded-first: an application opens a local `*.seaworld.db
 
 The engine core is implemented in stable Rust. `Cargo.toml` declares Rust 1.89 as its minimum version. Rust is the engine implementation language; future drivers can target Java, Python, JavaScript/TypeScript, Tyvera, and other hosts without changing that boundary.
 
-V1 remains byte-for-byte supported. New databases use the explicitly versioned V3 header and transaction grammar; V2 remains readable and writable through an explicit constructor. V1 handles keep single-operation CRUD and can be copied to V2 or V3 through a non-overwriting migration path before using transactions or indexes.
+V1 remains byte-for-byte supported. New databases use the explicitly versioned V4 header and transaction grammar; V2/V3 remain readable and can be created explicitly for compatibility tooling. V4 adds persistent index pages without changing the V1-V3 record grammar. V1 handles keep single-operation CRUD and can be copied to a later format through a non-overwriting compacted-copy path before using transactions or indexes.
 
 | Area | C++ | Rust | Java 21 |
 | --- | --- | --- | --- |
@@ -52,17 +52,17 @@ Application
                      *.seaworld.db
 ```
 
-The query engine consumes SeaWorld's own typed query representation. Adapters translate native API calls or a future supported SQL subset into that representation. They do not implement independent storage paths. The SQL parser is not implemented.
+The query engine consumes SeaWorld's own typed query representation. Native callers use that representation directly. SQL V0 has a bounded lexer/parser and lowers supported statements to the same query representation, planner, and transaction layer; it has no separate storage path.
 
 ## Modules
 
-- **Storage engine:** owns file creation/opening, V1/V2/V3 versioned headers, append-only record blocks, checksums, bounded reads, `File::sync_all` durability calls, an exclusive writer sidecar lock plus shared/exclusive database-file locks, version-aware transaction recovery, and compacted copies without replacing the source.
+- **Storage engine:** owns file creation/opening, V1/V2/V3/V4 versioned headers, append-only record blocks, bounded reads, checksums, `File::sync_all` calls, an exclusive writer sidecar lock plus shared/exclusive database-file locks, version-aware transaction recovery, and non-overwriting compacted copies.
 - **Document model:** defines null, boolean, signed 64-bit integer, finite floating point, UTF-8 string, binary, array, and object values. Nested objects and arrays are ordinary values, not a SQL-only feature.
 - **Collections:** group documents and persist collection metadata. Document IDs are stable, positive 64-bit identifiers within a database.
-- **Index engine:** the primary ID map and single-field/unique secondary indexes are rebuilt from committed state on replay. Ordered in-memory entries support equality and range candidates. Persistent index entries/pages, compound indexes, and text indexes are future work.
+- **Index engine:** the primary ID map and single-field/unique secondary indexes support equality and range candidates. V2/V3 definitions rebuild entries from documents; V4 stores immutable 4 KiB B+Tree pages in the append log and restores in-memory entries from persisted roots. Compound, text, and array-element indexes remain future work.
 - **Query engine/planner:** evaluates a typed native filter AST, chooses ID/index lookups or scans, and exposes a basic explain plan. It is independent of SQL.
-- **Transactions/recovery:** V2/V3 mutations are grouped under begin/commit markers in the existing append log. Recovery applies complete committed batches and discards an uncommitted tail. V3 snapshots retain bounded in-memory document versions; no separate WAL or page-based recovery exists.
-- **SQL interface:** a future adapter for a documented subset. It maps SQL null, missing fields, nested paths, arrays, and flexible schemas onto document/query semantics described in `query-engine.md`.
+- **Transactions/recovery:** V2-V4 mutations are grouped under begin/commit markers in the existing append log. V4 COW pages and root-publication records share the document transaction batch. Recovery applies complete committed batches and discards an uncommitted suffix. V3/V4 snapshots retain bounded in-memory document versions. The append-only log is also the recovery log; there is no independent page journal.
+- **SQL interface:** a restricted V0 parser supports SELECT, INSERT, UPDATE, DELETE, CREATE COLLECTION, and EXPLAIN SELECT with one predicate and positional values. Its mapping for null, missing fields, nested paths, arrays, and flexible schemas is specified in `sql.md`. Full SQL and SQL index DDL are not implemented.
 - **Server/driver:** a later transport boundary around the same engine. No cluster, replication, or wire-protocol compatibility is in scope.
 
 ## Concurrency and ownership
@@ -73,4 +73,4 @@ One exclusive writer handle and any fixed read-only handles are supported. The w
 
 Every persisted length is checked before allocation. The decoder limits record size, document size, nesting depth, collection-name size, field-name size, and element counts. UTF-8 decoding is strict. Header and record CRC32C checks detect accidental corruption; they are not authentication and do not protect against malicious modification. Invalid complete records fail open with a controlled error. Only an incomplete final record is recoverable, and its discarded byte count is exposed to the caller.
 
-The engine never derives file paths from collection names or document values. The database path is supplied by the application. There is no encryption or authentication in Phase 1.
+The engine never derives file paths from collection names or document values. The database path is supplied by the application. Page key lengths and traversal height are bounded; malformed pages, missing child references, invalid roots, and cycles return errors rather than being silently accepted. CRC32C does not authenticate files. Networking, encryption, and authentication are not implemented.

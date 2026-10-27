@@ -2,13 +2,13 @@
 
 ## Scope and format version
 
-New files use format V3. V1 and V2 keep their existing record grammar and CRUD/transaction behavior; V3 adds a durable commit-version watermark needed to prevent version rollback through compaction. A compacted copy may advance the watermark if rebuilding its snapshot requires more transactions than the source log. `Database::create_v2` and the V1/V2 migration APIs remain available for compatibility tests and tooling. Snapshots require V3.
+V3 introduced the durable commit-version watermark needed to prevent version rollback through compaction; V4 keeps that behavior and adds persistent B+Tree pages. New files use V4. V1 and V2 keep their existing record grammar and CRUD/transaction behavior. A compacted copy may advance the watermark if rebuilding its snapshot requires more transactions than the source log. `Database::create_v2`, `Database::create_v3`, and migration APIs remain available for compatibility tests and tooling. Snapshots require V3 or later.
 
 ## Commit versions
 
-`CommitVersion` is a distinct public type from document, collection, index, and transaction IDs. For V3, its positive numeric value is the transaction ID of the last successfully committed transaction. The transaction ID is assigned provisionally at begin, becomes a commit version only after the commit marker has been synchronized, and is reused after rollback or recovery of an incomplete transaction. No wall-clock time participates in version ordering. The V3 version-watermark record preserves the next commit version when a compacted copy rewrites the log.
+`CommitVersion` is a distinct public type from document, collection, index, and transaction IDs. For V3/V4, its positive numeric value is the transaction ID of the last successfully committed transaction. The transaction ID is assigned provisionally at begin, becomes a commit version only after the commit marker has been synchronized, and is reused after rollback or recovery of an incomplete transaction. No wall-clock time participates in version ordering. The version-watermark record preserves the next commit version when a compacted copy rewrites the log.
 
-The empty V3 database begins at version zero. A committed transaction advances the version by one. Standalone index-definition records do not change the document snapshot. Reaching the integer limit prevents another transaction before any bytes are appended.
+An empty V3/V4 database begins at version zero. A committed transaction advances the version by one. Standalone index-definition records do not change the document snapshot. Reaching the integer limit prevents another transaction before any bytes are appended.
 
 ## Visibility and lifecycle
 
@@ -28,7 +28,7 @@ Snapshots from the live writer are independently shareable across threads. The r
 
 ## Recovery
 
-V3 uses the existing checksummed append log. Recovery applies a transaction's documents and commit version only after its matching commit marker. Secondary index definitions are durable, while their ordered entries are rebuilt from committed documents on open; transactional index-entry deltas are not implemented. An incomplete transaction suffix is discarded from its begin record. A read-only open never truncates the file; if it finds an incomplete tail, it returns `RecoveryRequired` and asks the caller to open the database for recovery. A complete checksum or semantic error remains a corruption error.
+V3/V4 use the existing checksummed append log. Recovery applies a transaction's documents and commit version only after its matching commit marker. V3 secondary index entries are rebuilt from committed documents on open. V4 loads entries from the committed persistent B+Tree roots and checks them against live documents. An incomplete transaction suffix is discarded from its begin record. A read-only open never truncates the file; if it finds an incomplete tail, it returns `RecoveryRequired` and asks the caller to open the database for recovery. A complete checksum or semantic error remains a corruption error.
 
 Process-kill tests exercise commit visibility and reopen behavior. They do not establish power-loss durability. `sync_all()` is the API success boundary; filesystem, OS, and device guarantees still apply.
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 use crate::{Error, Result};
 
 pub(crate) const HEADER_SIZE: usize = 64;
@@ -10,6 +11,7 @@ pub(crate) const MAX_DATABASE_SIZE_BYTES: u64 = 128 * 1024 * 1024;
 pub(crate) const FORMAT_VERSION: u16 = 1;
 pub(crate) const TRANSACTION_FORMAT_VERSION: u16 = 2;
 pub(crate) const MVCC_FORMAT_VERSION: u16 = 3;
+pub(crate) const PERSISTENT_INDEX_FORMAT_VERSION: u16 = 4;
 pub(crate) const HEADER_MAGIC: &[u8; 8] = b"SWDB\r\n\x1a\n";
 pub(crate) const RECORD_MAGIC: &[u8; 4] = b"SWBL";
 
@@ -49,6 +51,7 @@ pub(crate) fn decode_header(bytes: &[u8]) -> Result<FileHeader> {
     if version != FORMAT_VERSION
         && version != TRANSACTION_FORMAT_VERSION
         && version != MVCC_FORMAT_VERSION
+        && version != PERSISTENT_INDEX_FORMAT_VERSION
     {
         return Err(Error::Format(format!(
             "unsupported format version {version}"

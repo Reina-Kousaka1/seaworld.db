@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet, HashMap},
@@ -11,10 +12,12 @@ use std::{
 use crate::{
     CollectionId, Document, DocumentId, Error, FieldPath, IndexId, Query, QueryPlan, QueryRow,
     Result, Value,
+    btree::{self, TreeKey},
     codec::{self, Cursor},
     format::{
         self, FORMAT_VERSION, HEADER_SIZE, MAX_RECORD_SIZE, MIN_RECORD_SIZE, MVCC_FORMAT_VERSION,
-        RECORD_MAGIC, RECORD_PREFIX_SIZE, TRANSACTION_FORMAT_VERSION,
+        PERSISTENT_INDEX_FORMAT_VERSION, RECORD_MAGIC, RECORD_PREFIX_SIZE,
+        TRANSACTION_FORMAT_VERSION,
     },
     index::{IndexValue, MAX_INDEXES, SecondaryIndex},
     mvcc::{CommitVersion, MvccStore, Snapshot},
@@ -48,6 +51,31 @@ impl RecoveryReport {
     }
 }
 
+/// Read-only summary returned after validating the currently opened database view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct IntegrityReport {
+    pub format_version: u16,
+    pub database_id: [u8; 16],
+    pub file_bytes: u64,
+    pub collection_count: usize,
+    pub document_count: usize,
+    pub index_count: usize,
+    pub persistent_page_count: usize,
+    pub committed_version: i64,
+    pub discarded_tail_bytes: u64,
+}
+
+/// Public metadata for one persisted single-field index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexInfo {
+    pub id: IndexId,
+    pub collection: String,
+    pub path: FieldPath,
+    pub unique: bool,
+    pub root_page_id: Option<u64>,
+    pub root_generation: Option<u64>,
+}
+
 struct CollectionState {
     id: i64,
     documents: BTreeMap<i64, Document>,
@@ -69,6 +97,8 @@ pub struct Database {
     collection_names_by_id: HashMap<i64, String>,
     primary_id_index: HashMap<i64, i64>,
     secondary_indexes: BTreeMap<i64, SecondaryIndex>,
+    persistent_pages: HashMap<u64, Vec<u8>>,
+    next_page_id: u64,
     next_sequence: i64,
     next_collection_id: i64,
     next_document_id: i64,
@@ -84,6 +114,11 @@ pub struct Database {
 impl Database {
     /// Creates a new database file and never overwrites an existing path.
     pub fn create(path: impl AsRef<Path>) -> Result<Self> {
+        Self::create_with_version(path.as_ref(), PERSISTENT_INDEX_FORMAT_VERSION)
+    }
+
+    /// Creates an explicit legacy V3 database for compatibility tooling.
+    pub fn create_v3(path: impl AsRef<Path>) -> Result<Self> {
         Self::create_with_version(path.as_ref(), MVCC_FORMAT_VERSION)
     }
 
@@ -218,6 +253,8 @@ impl Database {
             collection_names_by_id: HashMap::new(),
             primary_id_index: HashMap::new(),
             secondary_indexes: BTreeMap::new(),
+            persistent_pages: HashMap::new(),
+            next_page_id: 1,
             next_sequence: 1,
             next_collection_id: 1,
             next_document_id: 1,
@@ -277,7 +314,7 @@ impl Database {
 
     /// Begins a stable V3 read snapshot that can outlive a mutable writer borrow.
     pub fn begin_read(&self) -> Result<Snapshot> {
-        if self.format_version != MVCC_FORMAT_VERSION {
+        if self.format_version < MVCC_FORMAT_VERSION {
             return Err(Error::UpgradeRequired(
                 "write a V3 compacted copy before opening MVCC snapshots".into(),
             ));
@@ -285,7 +322,7 @@ impl Database {
         self.mvcc.snapshot()
     }
 
-    /// Starts a V2/V3 transaction. V1 files must first be copied to V2 or V3.
+    /// Starts a transaction in V2 or later. V1 files must first be copied to a transactional format.
     pub fn begin_transaction(&mut self) -> Result<Transaction<'_>> {
         self.check_usable()?;
         self.check_writable()?;
@@ -304,6 +341,160 @@ impl Database {
     /// Reports any incomplete final record discarded during open.
     pub const fn recovery_report(&self) -> RecoveryReport {
         self.recovery_report
+    }
+
+    /// Checks current in-memory records and index trees without writing or repairing the file.
+    pub fn check_integrity(&self) -> Result<IntegrityReport> {
+        self.check_usable()?;
+        let mut actual_documents = 0_usize;
+        for (name, collection) in &self.collections {
+            validate_collection_name(name)
+                .map_err(|_| Error::Integrity("in-memory collection name is invalid".into()))?;
+            if self.collection_names_by_id.get(&collection.id) != Some(name) {
+                return Err(Error::Integrity(
+                    "collection ID and name maps disagree".into(),
+                ));
+            }
+            for (id, document) in &collection.documents {
+                if *id <= 0 || self.primary_id_index.get(id) != Some(&collection.id) {
+                    return Err(Error::Integrity(
+                        "primary document index does not match a live document".into(),
+                    ));
+                }
+                for value in document.fields().values() {
+                    codec::validate_value(value).map_err(|error| {
+                        Error::Integrity(format!("invalid in-memory document value: {error}"))
+                    })?;
+                }
+                actual_documents = actual_documents
+                    .checked_add(1)
+                    .ok_or_else(|| Error::Integrity("document count overflow".into()))?;
+            }
+        }
+        if actual_documents != self.document_count
+            || self.primary_id_index.len() != self.document_count
+        {
+            return Err(Error::Integrity(
+                "document count and primary index disagree".into(),
+            ));
+        }
+
+        let committed_version = self.next_transaction_id.saturating_sub(1);
+        for index in self.secondary_indexes.values() {
+            let collection_name = self
+                .collection_names_by_id
+                .get(&index.collection_id)
+                .ok_or_else(|| Error::Integrity("index names an unknown collection".into()))?;
+            let collection = self
+                .collections
+                .get(collection_name)
+                .ok_or_else(|| Error::Integrity("index collection is missing".into()))?;
+            let mut expected = BTreeMap::new();
+            for (document_id, document) in &collection.documents {
+                if let Some(key) = index.key_for(document)? {
+                    expected
+                        .entry(key)
+                        .or_insert_with(BTreeSet::new)
+                        .insert(DocumentId(*document_id));
+                }
+            }
+            if expected != index.entries {
+                return Err(Error::Integrity(
+                    "secondary index entries do not match collection documents".into(),
+                ));
+            }
+            if self.format_version >= PERSISTENT_INDEX_FORMAT_VERSION {
+                if index.root_page_id == 0 || index.root_generation > committed_version as u64 {
+                    return Err(Error::Integrity("persistent index root is invalid".into()));
+                }
+                let actual: Vec<_> = btree::collect_entries(
+                    index.root_page_id,
+                    index.id.value(),
+                    index.root_generation,
+                    &self.persistent_pages,
+                )?;
+                let expected: Vec<_> = index
+                    .entries
+                    .iter()
+                    .flat_map(|(value, ids)| {
+                        ids.iter()
+                            .map(|document_id| TreeKey::new(value.clone(), *document_id))
+                    })
+                    .collect();
+                if actual != expected {
+                    return Err(Error::Integrity(
+                        "persistent B+Tree does not match its index and documents".into(),
+                    ));
+                }
+            }
+        }
+        if self.format_version >= PERSISTENT_INDEX_FORMAT_VERSION {
+            for (page_id, bytes) in &self.persistent_pages {
+                let (decoded_id, _, generation) = btree::decode_stored_page(bytes)?;
+                if decoded_id != *page_id || generation > committed_version as u64 {
+                    return Err(Error::Integrity(
+                        "stored page identity or generation is invalid".into(),
+                    ));
+                }
+            }
+        }
+        Ok(IntegrityReport {
+            format_version: self.format_version,
+            database_id: self.database_id,
+            file_bytes: self.file.metadata()?.len(),
+            collection_count: self.collections.len(),
+            document_count: self.document_count,
+            index_count: self.secondary_indexes.len(),
+            persistent_page_count: self.persistent_pages.len(),
+            committed_version,
+            discarded_tail_bytes: self.recovery_report.discarded_bytes(),
+        })
+    }
+
+    /// Returns index metadata in stable ID order for inspection tools.
+    pub fn indexes(&self) -> Result<Vec<IndexInfo>> {
+        self.check_usable()?;
+        self.secondary_indexes
+            .values()
+            .map(|index| {
+                let collection = self
+                    .collection_names_by_id
+                    .get(&index.collection_id)
+                    .cloned()
+                    .ok_or_else(|| Error::Integrity("index names an unknown collection".into()))?;
+                Ok(IndexInfo {
+                    id: index.id,
+                    collection,
+                    path: index.path.clone(),
+                    unique: index.unique,
+                    root_page_id: (index.root_page_id != 0).then_some(index.root_page_id),
+                    root_generation: (index.root_page_id != 0).then_some(index.root_generation),
+                })
+            })
+            .collect()
+    }
+
+    /// Parses and executes the supported, document-aware SeaWorld SQL subset.
+    /// SQL is translated to the same native query/planner and transaction APIs.
+    pub fn execute_sql(
+        &mut self,
+        statement: &str,
+        parameters: &[Value],
+    ) -> Result<crate::SqlResult> {
+        crate::sql::execute(self, statement, parameters)
+    }
+
+    /// Writes a consistent V4 compacted backup and never replaces an existing destination.
+    pub fn backup(&self, target: impl AsRef<Path>) -> Result<()> {
+        self.check_integrity()?;
+        self.write_v4_compacted_copy(target)
+    }
+
+    /// Validates a backup read-only and restores it to a new V4 file without overwriting.
+    pub fn restore_backup(source: impl AsRef<Path>, target: impl AsRef<Path>) -> Result<()> {
+        let source = Self::open_reader(source)?;
+        source.check_integrity()?;
+        source.write_v4_compacted_copy(target)
     }
 
     /// Persists a new collection and returns its database-local identifier.
@@ -500,13 +691,13 @@ impl Database {
         Ok(names)
     }
 
-    /// Creates a persistent non-unique single-field index definition in V2 or V3.
+    /// Creates a persistent non-unique single-field index definition in V2 or later.
     pub fn create_index(&mut self, collection_name: &str, path: &str) -> Result<IndexId> {
         let path = FieldPath::parse(path)?;
         self.create_index_path(collection_name, path, false)
     }
 
-    /// Creates a persistent unique single-field index definition in V2 or V3.
+    /// Creates a persistent unique single-field index definition in V2 or later.
     pub fn create_unique_index(&mut self, collection_name: &str, path: &str) -> Result<IndexId> {
         let path = FieldPath::parse(path)?;
         self.create_index_path(collection_name, path, true)
@@ -551,11 +742,143 @@ impl Database {
             index.insert(DocumentId(*document_id), document)?;
         }
 
-        let payload = encode_index_definition(&index)?;
+        if self.format_version >= PERSISTENT_INDEX_FORMAT_VERSION {
+            let generation = self.next_transaction_id.saturating_sub(1) as u64;
+            let keys = index.entries.iter().flat_map(|(value, ids)| {
+                ids.iter()
+                    .map(|document_id| TreeKey::new(value.clone(), *document_id))
+            });
+            let update = btree::build_tree(
+                id.value(),
+                generation,
+                self.next_page_id,
+                &self.persistent_pages,
+                keys,
+            )?;
+            self.append_index_pages(&update.pages)?;
+            index.root_page_id = update.root_page_id;
+            index.root_generation = generation;
+            self.next_page_id = update.next_page_id;
+        }
+
+        let payload = encode_index_definition(&index, self.format_version)?;
         self.append_record(RecordType::IndexCreate, &payload)?;
         self.secondary_indexes.insert(id.value(), index);
         self.next_index_id = id.value() + 1;
         Ok(id)
+    }
+
+    fn append_index_pages(&mut self, pages: &BTreeMap<u64, Vec<u8>>) -> Result<()> {
+        for (page_id, bytes) in pages {
+            if *page_id != self.next_page_id {
+                return Err(Error::Integrity(
+                    "new B+Tree page IDs must be contiguous".into(),
+                ));
+            }
+            let (decoded_id, _, _) = btree::decode_stored_page(bytes)?;
+            if decoded_id != *page_id {
+                return Err(Error::Integrity(
+                    "B+Tree page ID mismatch before write".into(),
+                ));
+            }
+            self.append_record(RecordType::IndexPage, bytes)?;
+            self.persistent_pages.insert(*page_id, bytes.clone());
+            self.next_page_id = page_id
+                .checked_add(1)
+                .ok_or_else(|| Error::Limit("B+Tree page ID space exhausted".into()))?;
+        }
+        Ok(())
+    }
+
+    fn publish_index_batch(&mut self, transaction_id: i64, batch: PendingIndexBatch) -> Result<()> {
+        if self.format_version < PERSISTENT_INDEX_FORMAT_VERSION {
+            if !batch.pages.is_empty() || !batch.roots.is_empty() {
+                return Err(Error::Integrity(
+                    "legacy database contains persistent index records".into(),
+                ));
+            }
+            return Ok(());
+        }
+        let mut overlay = BTreeMap::new();
+        let mut expected_page_id = self.next_page_id;
+        for (page_id, bytes) in &batch.pages {
+            if *page_id != expected_page_id {
+                return Err(Error::Integrity(
+                    "persistent B+Tree page IDs are not sequential".into(),
+                ));
+            }
+            let (decoded_id, owner, generation) = btree::decode_stored_page(bytes)?;
+            if decoded_id != *page_id || generation != transaction_id as u64 {
+                return Err(Error::Integrity(
+                    "transaction B+Tree page has invalid metadata".into(),
+                ));
+            }
+            if !self.secondary_indexes.contains_key(&owner) {
+                return Err(Error::Integrity(
+                    "transaction B+Tree page names an unknown index".into(),
+                ));
+            }
+            overlay.insert(*page_id, bytes.clone());
+            expected_page_id = expected_page_id
+                .checked_add(1)
+                .ok_or_else(|| Error::Integrity("B+Tree page ID overflow".into()))?;
+        }
+        if batch.next_page_id != expected_page_id {
+            return Err(Error::Integrity(
+                "transaction B+Tree page watermark is invalid".into(),
+            ));
+        }
+
+        let mut updated = BTreeSet::new();
+        for root in &batch.roots {
+            if root.generation != transaction_id as u64
+                || root.root_page_id == 0
+                || !updated.insert(root.index_id)
+            {
+                return Err(Error::Integrity(
+                    "invalid or duplicate B+Tree root publication".into(),
+                ));
+            }
+            let index = self.secondary_indexes.get(&root.index_id).ok_or_else(|| {
+                Error::Integrity("root publication names an unknown index".into())
+            })?;
+            let tree_entries = btree::collect_entries_with_overlay(
+                root.root_page_id,
+                root.index_id,
+                root.generation,
+                &self.persistent_pages,
+                &overlay,
+            )?;
+            let expected_entries: Vec<_> = index
+                .entries
+                .iter()
+                .flat_map(|(value, ids)| {
+                    ids.iter()
+                        .map(|document_id| TreeKey::new(value.clone(), *document_id))
+                })
+                .collect();
+            if tree_entries != expected_entries {
+                return Err(Error::Integrity(
+                    "published B+Tree does not match committed index entries".into(),
+                ));
+            }
+        }
+        if !overlay.is_empty() && updated.is_empty() {
+            return Err(Error::Integrity(
+                "transaction contains unreachable B+Tree pages".into(),
+            ));
+        }
+        for root in batch.roots {
+            let index = self
+                .secondary_indexes
+                .get_mut(&root.index_id)
+                .expect("root index was validated");
+            index.root_page_id = root.root_page_id;
+            index.root_generation = root.generation;
+        }
+        self.persistent_pages.extend(overlay);
+        self.next_page_id = expected_page_id;
+        Ok(())
     }
 
     /// Returns the primary, secondary, or collection-scan plan for a query.
@@ -734,7 +1057,7 @@ impl Database {
         id: i64,
         operations: &[StagedOperation],
         overlay: &HashMap<i64, OverlayDocument>,
-    ) -> Result<()> {
+    ) -> Result<PendingIndexBatch> {
         self.check_usable()?;
         self.require_v2("transactions")?;
         if id <= 0 || id != self.next_transaction_id || id == i64::MAX {
@@ -756,7 +1079,11 @@ impl Database {
                 .ensure_commit_capacity(CommitVersion::new(id), &changes)?;
         }
 
-        let mut blocks = Vec::with_capacity(operations.len() + 2);
+        let index_batch = self.prepare_index_batch(id, overlay)?;
+
+        let mut blocks = Vec::with_capacity(
+            operations.len() + index_batch.pages.len() + index_batch.roots.len() + 2,
+        );
         let begin_payload = id.to_be_bytes();
         let mut sequence = self.next_sequence;
         blocks.push(encode_record(
@@ -780,6 +1107,50 @@ impl Database {
                 return Err(Error::Limit("transaction byte limit exceeded".into()));
             }
             blocks.push(encode_record(operation.record_type(), sequence, &payload)?);
+            sequence = sequence
+                .checked_add(1)
+                .ok_or_else(|| Error::Limit("record sequence space is exhausted".into()))?;
+        }
+        let mut transaction_bytes = blocks
+            .iter()
+            .skip(1)
+            .map(|block| block.len() - MIN_RECORD_SIZE)
+            .try_fold(0_usize, |size, payload| {
+                size.checked_add(payload)
+                    .ok_or_else(|| Error::Limit("transaction byte length overflow".into()))
+            })?;
+        if transaction_bytes > MAX_TRANSACTION_BYTES {
+            return Err(Error::Limit("transaction byte limit exceeded".into()));
+        }
+        for (page_id, page) in &index_batch.pages {
+            let mut payload = Vec::with_capacity(8 + page.len());
+            payload.extend_from_slice(&id.to_be_bytes());
+            payload.extend_from_slice(page);
+            transaction_bytes = transaction_bytes
+                .checked_add(payload.len())
+                .ok_or_else(|| Error::Limit("transaction byte length overflow".into()))?;
+            if transaction_bytes > MAX_TRANSACTION_BYTES {
+                return Err(Error::Limit("transaction byte limit exceeded".into()));
+            }
+            let _ = page_id;
+            blocks.push(encode_record(RecordType::IndexPage, sequence, &payload)?);
+            sequence = sequence
+                .checked_add(1)
+                .ok_or_else(|| Error::Limit("record sequence space is exhausted".into()))?;
+        }
+        for root in &index_batch.roots {
+            let mut payload = Vec::with_capacity(32);
+            payload.extend_from_slice(&id.to_be_bytes());
+            payload.extend_from_slice(&root.index_id.to_be_bytes());
+            payload.extend_from_slice(&(root.root_page_id as i64).to_be_bytes());
+            payload.extend_from_slice(&(root.generation as i64).to_be_bytes());
+            transaction_bytes = transaction_bytes
+                .checked_add(payload.len())
+                .ok_or_else(|| Error::Limit("transaction byte length overflow".into()))?;
+            if transaction_bytes > MAX_TRANSACTION_BYTES {
+                return Err(Error::Limit("transaction byte limit exceeded".into()));
+            }
+            blocks.push(encode_record(RecordType::IndexRoot, sequence, &payload)?);
             sequence = sequence
                 .checked_add(1)
                 .ok_or_else(|| Error::Limit("record sequence space is exhausted".into()))?;
@@ -820,11 +1191,43 @@ impl Database {
             self.file.write_all(&blocks[0])?;
             crash_transaction_at("transaction_after_begin");
             for (index, block) in blocks[1..blocks.len() - 1].iter().enumerate() {
+                let first_page_record = index == operations.len();
+                let page_record =
+                    index >= operations.len() && index < operations.len() + index_batch.pages.len();
+                let first_root_record = index == operations.len() + index_batch.pages.len();
+                if first_page_record {
+                    crash_transaction_at("transaction_before_index_page_write");
+                }
+                if first_root_record {
+                    crash_transaction_at("transaction_before_root_publication");
+                }
                 if index == 0 && crash_transaction_during("transaction_during_first_operation") {
                     self.file.write_all(&block[..(block.len() / 2).max(1)])?;
                     crash_pause("transaction_during_first_operation");
                 }
+                if first_page_record
+                    && crash_transaction_during("transaction_during_index_page_write")
+                {
+                    self.file.write_all(&block[..(block.len() / 2).max(1)])?;
+                    crash_pause("transaction_during_index_page_write");
+                }
+                if first_root_record
+                    && crash_transaction_during("transaction_during_root_publication")
+                {
+                    self.file.write_all(&block[..(block.len() / 2).max(1)])?;
+                    crash_pause("transaction_during_root_publication");
+                }
                 self.file.write_all(block)?;
+                if page_record {
+                    crash_transaction_at("transaction_after_index_page_write");
+                }
+                if index + 1 == operations.len() + index_batch.pages.len() {
+                    crash_transaction_at("transaction_after_index_pages_before_root");
+                }
+                if index + 1 == operations.len() + index_batch.pages.len() + index_batch.roots.len()
+                {
+                    crash_transaction_at("transaction_after_root_before_commit");
+                }
                 if index == 0 && blocks.len() > 3 {
                     crash_transaction_at("transaction_between_operations");
                 }
@@ -858,7 +1261,64 @@ impl Database {
             return Err(Error::Io(error));
         }
         self.next_sequence = next_sequence;
-        Ok(())
+        Ok(index_batch)
+    }
+
+    fn prepare_index_batch(
+        &self,
+        transaction_id: i64,
+        overlay: &HashMap<i64, OverlayDocument>,
+    ) -> Result<PendingIndexBatch> {
+        let mut batch = PendingIndexBatch {
+            next_page_id: self.next_page_id,
+            ..PendingIndexBatch::default()
+        };
+        if self.format_version < PERSISTENT_INDEX_FORMAT_VERSION {
+            return Ok(batch);
+        }
+        let deltas = self.index_updates_for_overlay(overlay)?;
+        let mut by_index: BTreeMap<i64, Vec<(TreeKey, bool)>> = BTreeMap::new();
+        for delta in deltas {
+            if let Some(key) = delta.old_key {
+                by_index
+                    .entry(delta.index_id)
+                    .or_default()
+                    .push((TreeKey::new(key, delta.document_id), false));
+            }
+            if let Some(key) = delta.new_key {
+                by_index
+                    .entry(delta.index_id)
+                    .or_default()
+                    .push((TreeKey::new(key, delta.document_id), true));
+            }
+        }
+        for (index_id, changes) in by_index {
+            let index = self
+                .secondary_indexes
+                .get(&index_id)
+                .ok_or_else(|| Error::Integrity("index delta names an unknown index".into()))?;
+            if index.root_page_id == 0 {
+                return Err(Error::Integrity("persistent index has no root page".into()));
+            }
+            let update = btree::apply_changes(
+                index_id,
+                index.root_page_id,
+                transaction_id as u64,
+                batch.next_page_id,
+                &self.persistent_pages,
+                changes,
+            )?;
+            if update.root_page_id != index.root_page_id {
+                batch.roots.push(RootPublication {
+                    index_id,
+                    root_page_id: update.root_page_id,
+                    generation: transaction_id as u64,
+                });
+            }
+            batch.next_page_id = update.next_page_id;
+            batch.pages.extend(update.pages);
+        }
+        Ok(batch)
     }
 
     fn apply_transaction_state(
@@ -967,87 +1427,22 @@ impl Database {
             ));
         }
 
-        let mut index_updates = Vec::new();
-        for index in self.secondary_indexes.values() {
-            let mut final_unique_keys = BTreeMap::new();
-            for document_id in &document_ids {
-                let entry = overlay.get(document_id).expect("overlay ID was collected");
-                let old_key =
-                    if self.primary_id_index.get(document_id) == Some(&index.collection_id) {
-                        let old_name = self
-                            .collection_names_by_id
-                            .get(&index.collection_id)
-                            .ok_or_else(|| {
-                                Error::Integrity("index names an unknown collection".into())
-                            })?;
-                        let old_document = self
-                            .collections
-                            .get(old_name)
-                            .and_then(|collection| collection.documents.get(document_id))
-                            .ok_or_else(|| {
-                                Error::Integrity("index source document is missing".into())
-                            })?;
-                        index.key_for(old_document)?
-                    } else {
-                        None
-                    };
-                let new_key = if entry.collection_id == index.collection_id {
-                    entry
-                        .document
-                        .as_ref()
-                        .map(|document| index.key_for(document))
-                        .transpose()?
-                        .flatten()
-                } else {
-                    None
-                };
-                if index.unique
-                    && let Some(key) = &new_key
-                {
-                    if index.entries.get(key).is_some_and(|ids| {
-                        ids.iter()
-                            .any(|existing| !overlay.contains_key(&existing.value()))
-                    }) {
-                        return Err(Error::ConstraintViolation(format!(
-                            "unique index {} rejects duplicate value",
-                            index.path
-                        )));
-                    }
-                    if final_unique_keys
-                        .insert(key.clone(), *document_id)
-                        .is_some()
-                    {
-                        return Err(Error::ConstraintViolation(format!(
-                            "unique index {} rejects duplicate values in transaction",
-                            index.path
-                        )));
-                    }
-                }
-                if old_key != new_key {
-                    index_updates.push((
-                        index.id.value(),
-                        DocumentId(*document_id),
-                        old_key,
-                        new_key,
-                    ));
-                }
-            }
-        }
+        let index_updates = self.index_updates_for_overlay(overlay)?;
 
-        for (index_id, document_id, old_key, _) in &index_updates {
-            if let Some(key) = old_key {
+        for update in &index_updates {
+            if let Some(key) = &update.old_key {
                 self.secondary_indexes
-                    .get_mut(index_id)
+                    .get_mut(&update.index_id)
                     .expect("prevalidated index exists")
-                    .remove_key(*document_id, key);
+                    .remove_key(update.document_id, key);
             }
         }
-        for (index_id, document_id, _, new_key) in &index_updates {
-            if let Some(key) = new_key {
+        for update in &index_updates {
+            if let Some(key) = &update.new_key {
                 self.secondary_indexes
-                    .get_mut(index_id)
+                    .get_mut(&update.index_id)
                     .expect("prevalidated index exists")
-                    .insert_key(*document_id, key.clone());
+                    .insert_key(update.document_id, key.clone());
             }
         }
 
@@ -1117,6 +1512,81 @@ impl Database {
             }
         }
         Ok(())
+    }
+
+    fn index_updates_for_overlay(
+        &self,
+        overlay: &HashMap<i64, OverlayDocument>,
+    ) -> Result<Vec<IndexDelta>> {
+        let mut document_ids: Vec<_> = overlay.keys().copied().collect();
+        document_ids.sort_unstable();
+        let mut updates = Vec::new();
+        for index in self.secondary_indexes.values() {
+            let mut final_unique_keys = BTreeMap::new();
+            for document_id in &document_ids {
+                let entry = overlay.get(document_id).expect("overlay ID was collected");
+                let old_key =
+                    if self.primary_id_index.get(document_id) == Some(&index.collection_id) {
+                        let old_name = self
+                            .collection_names_by_id
+                            .get(&index.collection_id)
+                            .ok_or_else(|| {
+                                Error::Integrity("index names an unknown collection".into())
+                            })?;
+                        let old_document = self
+                            .collections
+                            .get(old_name)
+                            .and_then(|collection| collection.documents.get(document_id))
+                            .ok_or_else(|| {
+                                Error::Integrity("index source document is missing".into())
+                            })?;
+                        index.key_for(old_document)?
+                    } else {
+                        None
+                    };
+                let new_key = if entry.collection_id == index.collection_id {
+                    entry
+                        .document
+                        .as_ref()
+                        .map(|document| index.key_for(document))
+                        .transpose()?
+                        .flatten()
+                } else {
+                    None
+                };
+                if index.unique
+                    && let Some(key) = &new_key
+                {
+                    if index.entries.get(key).is_some_and(|ids| {
+                        ids.iter()
+                            .any(|existing| !overlay.contains_key(&existing.value()))
+                    }) {
+                        return Err(Error::ConstraintViolation(format!(
+                            "unique index {} rejects duplicate value",
+                            index.path
+                        )));
+                    }
+                    if final_unique_keys
+                        .insert(key.clone(), *document_id)
+                        .is_some()
+                    {
+                        return Err(Error::ConstraintViolation(format!(
+                            "unique index {} rejects duplicate values in transaction",
+                            index.path
+                        )));
+                    }
+                }
+                if old_key != new_key {
+                    updates.push(IndexDelta {
+                        index_id: index.id.value(),
+                        document_id: DocumentId(*document_id),
+                        old_key,
+                        new_key,
+                    });
+                }
+            }
+        }
+        Ok(updates)
     }
 
     /// Writes a compacted copy in the source file version without replacing it.
@@ -1248,6 +1718,15 @@ impl Database {
             return Err(Error::ActiveSnapshots);
         }
         self.write_transactional_compacted_copy(target, MVCC_FORMAT_VERSION)
+    }
+
+    /// Writes a V4 snapshot with persistent copy-on-write index pages.
+    /// Active snapshots must be released before compaction can proceed.
+    pub fn write_v4_compacted_copy(&self, target: impl AsRef<Path>) -> Result<()> {
+        if self.mvcc.has_active_snapshots()? {
+            return Err(Error::ActiveSnapshots);
+        }
+        self.write_transactional_compacted_copy(target, PERSISTENT_INDEX_FORMAT_VERSION)
     }
 
     fn write_transactional_compacted_copy(
@@ -1602,6 +2081,9 @@ impl Database {
                         start_sequence: sequence,
                         operations: Vec::new(),
                         operation_bytes: 0,
+                        index_pages: Vec::new(),
+                        index_roots: Vec::new(),
+                        roots_started: false,
                     });
                 }
                 RecordType::TransactionCommit => {
@@ -1616,7 +2098,12 @@ impl Database {
                             "transaction commit identifier does not match its begin".into(),
                         ));
                     }
-                    self.apply_replayed_transaction(id, &transaction.operations)?;
+                    let index_batch = self.replay_index_batch(
+                        id,
+                        transaction.index_pages,
+                        transaction.index_roots,
+                    )?;
+                    self.apply_replayed_transaction(id, &transaction.operations, index_batch)?;
                 }
                 RecordType::CollectionCreate
                 | RecordType::DocumentInsert
@@ -1625,6 +2112,11 @@ impl Database {
                     let transaction = pending.as_mut().ok_or_else(|| {
                         Error::Integrity("V2 mutation is outside a transaction".into())
                     })?;
+                    if transaction.roots_started {
+                        return Err(Error::Integrity(
+                            "document mutation appears after index root publication".into(),
+                        ));
+                    }
                     let mut input = Cursor::new(payload);
                     let id = input.i64("transaction identifier")?;
                     if id != transaction.id {
@@ -1651,6 +2143,92 @@ impl Database {
                         ));
                     }
                     transaction.operations.push(operation);
+                }
+                RecordType::IndexPage => {
+                    if self.format_version < PERSISTENT_INDEX_FORMAT_VERSION {
+                        return Err(Error::Format(
+                            "persistent B+Tree pages require format version 4".into(),
+                        ));
+                    }
+                    if pending.is_none() {
+                        self.replay_standalone_index_page(payload)?;
+                        self.next_sequence += 1;
+                        offset += block_length as u64;
+                        continue;
+                    }
+                    let transaction = pending.as_mut().expect("pending transaction was checked");
+                    if transaction.roots_started {
+                        return Err(Error::Integrity(
+                            "B+Tree page appears after root publication".into(),
+                        ));
+                    }
+                    let mut input = Cursor::new(payload);
+                    let transaction_id = input.i64("B+Tree transaction identifier")?;
+                    if transaction_id != transaction.id {
+                        return Err(Error::Integrity(
+                            "B+Tree page transaction identifier does not match".into(),
+                        ));
+                    }
+                    let page = input.bytes_exact(btree::PAGE_SIZE, "B+Tree page")?;
+                    input.finish("B+Tree page record")?;
+                    transaction.operation_bytes = transaction
+                        .operation_bytes
+                        .checked_add(payload.len())
+                        .ok_or_else(|| Error::Integrity("transaction size overflow".into()))?;
+                    if transaction.operation_bytes > MAX_TRANSACTION_BYTES {
+                        return Err(Error::Integrity(
+                            "transaction byte limit exceeded in file".into(),
+                        ));
+                    }
+                    if transaction.index_pages.len() as u64 >= btree::MAX_BTREE_PAGES {
+                        return Err(Error::Integrity(
+                            "transaction B+Tree page limit exceeded in file".into(),
+                        ));
+                    }
+                    transaction.index_pages.push(page);
+                }
+                RecordType::IndexRoot => {
+                    if self.format_version < PERSISTENT_INDEX_FORMAT_VERSION {
+                        return Err(Error::Format(
+                            "transactional B+Tree roots require format version 4".into(),
+                        ));
+                    }
+                    let transaction = pending.as_mut().ok_or_else(|| {
+                        Error::Integrity("B+Tree root is outside a transaction".into())
+                    })?;
+                    transaction.roots_started = true;
+                    let mut input = Cursor::new(payload);
+                    let transaction_id = input.i64("root transaction identifier")?;
+                    let index_id = input.i64("root index identifier")?;
+                    let root_page_id = input.i64("root page identifier")?;
+                    let generation = input.i64("root generation")?;
+                    input.finish("B+Tree root publication")?;
+                    if transaction_id != transaction.id
+                        || index_id <= 0
+                        || root_page_id <= 0
+                        || generation != transaction.id
+                    {
+                        return Err(Error::Integrity("invalid B+Tree root publication".into()));
+                    }
+                    transaction.operation_bytes = transaction
+                        .operation_bytes
+                        .checked_add(payload.len())
+                        .ok_or_else(|| Error::Integrity("transaction size overflow".into()))?;
+                    if transaction.operation_bytes > MAX_TRANSACTION_BYTES {
+                        return Err(Error::Integrity(
+                            "transaction byte limit exceeded in file".into(),
+                        ));
+                    }
+                    if transaction.index_roots.len() >= MAX_INDEXES {
+                        return Err(Error::Integrity(
+                            "transaction root publication count exceeds the index limit".into(),
+                        ));
+                    }
+                    transaction.index_roots.push(RootPublication {
+                        index_id,
+                        root_page_id: root_page_id as u64,
+                        generation: generation as u64,
+                    });
                 }
                 RecordType::IndexCreate => {
                     if pending.is_some() {
@@ -1696,6 +2274,7 @@ impl Database {
         &mut self,
         id: i64,
         operations: &[StagedOperation],
+        index_batch: PendingIndexBatch,
     ) -> Result<()> {
         if id != self.next_transaction_id {
             return Err(Error::Integrity(
@@ -1756,8 +2335,70 @@ impl Database {
             })?;
         }
         transaction
-            .apply_staged()
+            .apply_staged_with_index_batch(Some(index_batch))
             .map_err(|error| Error::Integrity(format!("could not replay transaction: {error}")))
+    }
+
+    fn replay_standalone_index_page(&mut self, payload: &[u8]) -> Result<()> {
+        let (page_id, owner, generation) = btree::decode_stored_page(payload)?;
+        if payload.len() != btree::PAGE_SIZE
+            || page_id != self.next_page_id
+            || owner != self.next_index_id
+            || generation > self.next_transaction_id.saturating_sub(1) as u64
+            || self.persistent_pages.len() as u64 >= btree::MAX_BTREE_PAGES
+        {
+            return Err(Error::Integrity(
+                "standalone B+Tree page has invalid ID, owner, generation or size".into(),
+            ));
+        }
+        self.persistent_pages.insert(page_id, payload.to_vec());
+        self.next_page_id = page_id
+            .checked_add(1)
+            .ok_or_else(|| Error::Integrity("B+Tree page ID overflow".into()))?;
+        Ok(())
+    }
+
+    fn replay_index_batch(
+        &self,
+        transaction_id: i64,
+        pages: Vec<Vec<u8>>,
+        roots: Vec<RootPublication>,
+    ) -> Result<PendingIndexBatch> {
+        if self.format_version < PERSISTENT_INDEX_FORMAT_VERSION {
+            if !pages.is_empty() || !roots.is_empty() {
+                return Err(Error::Integrity(
+                    "legacy transaction contains persistent B+Tree records".into(),
+                ));
+            }
+            return Ok(PendingIndexBatch::default());
+        }
+        if pages.len() as u64 > btree::MAX_BTREE_PAGES {
+            return Err(Error::Integrity(
+                "transaction B+Tree page limit exceeded".into(),
+            ));
+        }
+        let mut batch = PendingIndexBatch {
+            next_page_id: self.next_page_id,
+            ..PendingIndexBatch::default()
+        };
+        for bytes in pages {
+            let (page_id, owner, generation) = btree::decode_stored_page(&bytes)?;
+            if page_id != batch.next_page_id
+                || generation != transaction_id as u64
+                || !self.secondary_indexes.contains_key(&owner)
+            {
+                return Err(Error::Integrity(
+                    "transaction B+Tree page has invalid identity or generation".into(),
+                ));
+            }
+            batch.pages.insert(page_id, bytes);
+            batch.next_page_id = batch
+                .next_page_id
+                .checked_add(1)
+                .ok_or_else(|| Error::Integrity("B+Tree page ID overflow".into()))?;
+        }
+        batch.roots = roots;
+        Ok(batch)
     }
 
     fn replay_index_definition(&mut self, payload: &[u8]) -> Result<()> {
@@ -1779,6 +2420,17 @@ impl Database {
         for _ in 0..segment_count {
             segments.push(input.string(1_024, "field path segment")?);
         }
+        let (root_page_id, root_generation) =
+            if self.format_version >= PERSISTENT_INDEX_FORMAT_VERSION {
+                let root_page_id = input.i64("index root page identifier")?;
+                let root_generation = input.i64("index root generation")?;
+                if root_page_id <= 0 || root_generation < 0 {
+                    return Err(Error::Integrity("invalid persistent index root".into()));
+                }
+                (root_page_id as u64, root_generation as u64)
+            } else {
+                (0, 0)
+            };
         input.finish("index definition record")?;
         if index_id <= 0 || index_id != self.next_index_id {
             return Err(Error::Integrity(
@@ -1820,10 +2472,44 @@ impl Database {
             .collections
             .get(collection_name)
             .expect("collection name map was checked");
-        for (document_id, document) in &collection.documents {
-            index
-                .insert(DocumentId(*document_id), document)
-                .map_err(|error| Error::Integrity(format!("invalid persisted index: {error}")))?;
+        if self.format_version >= PERSISTENT_INDEX_FORMAT_VERSION {
+            if root_generation > self.next_transaction_id.saturating_sub(1) as u64 {
+                return Err(Error::Integrity(
+                    "persistent index root generation is in the future".into(),
+                ));
+            }
+            let tree_entries = btree::collect_entries(
+                root_page_id,
+                index_id,
+                root_generation,
+                &self.persistent_pages,
+            )?;
+            for entry in tree_entries {
+                let document = collection
+                    .documents
+                    .get(&entry.document_id.value())
+                    .ok_or_else(|| {
+                        Error::Integrity("persistent index references a missing document".into())
+                    })?;
+                if index.key_for(document)?.as_ref() != Some(&entry.value) {
+                    return Err(Error::Integrity(
+                        "persistent index key does not match its document".into(),
+                    ));
+                }
+                index.insert(entry.document_id, document).map_err(|error| {
+                    Error::Integrity(format!("invalid persisted index: {error}"))
+                })?;
+            }
+            index.root_page_id = root_page_id;
+            index.root_generation = root_generation;
+        } else {
+            for (document_id, document) in &collection.documents {
+                index
+                    .insert(DocumentId(*document_id), document)
+                    .map_err(|error| {
+                        Error::Integrity(format!("invalid persisted index: {error}"))
+                    })?;
+            }
         }
         self.secondary_indexes.insert(index_id, index);
         self.next_index_id = index_id.checked_add(1).unwrap_or(0);
@@ -1989,6 +2675,8 @@ impl Database {
             RecordType::TransactionBegin
             | RecordType::TransactionCommit
             | RecordType::IndexCreate
+            | RecordType::IndexPage
+            | RecordType::IndexRoot
             | RecordType::DocumentIdWatermark
             | RecordType::VersionWatermark => {
                 return Err(Error::Format(
@@ -2125,6 +2813,29 @@ struct PendingReplayTransaction {
     start_sequence: i64,
     operations: Vec<StagedOperation>,
     operation_bytes: usize,
+    index_pages: Vec<Vec<u8>>,
+    index_roots: Vec<RootPublication>,
+    roots_started: bool,
+}
+
+#[derive(Default)]
+struct PendingIndexBatch {
+    pages: BTreeMap<u64, Vec<u8>>,
+    roots: Vec<RootPublication>,
+    next_page_id: u64,
+}
+
+struct RootPublication {
+    index_id: i64,
+    root_page_id: u64,
+    generation: u64,
+}
+
+struct IndexDelta {
+    index_id: i64,
+    document_id: DocumentId,
+    old_key: Option<IndexValue>,
+    new_key: Option<IndexValue>,
 }
 
 struct OverlayDocument {
@@ -2235,6 +2946,8 @@ fn decode_staged_operation(record_type: RecordType, payload: &[u8]) -> Result<St
         RecordType::TransactionBegin
         | RecordType::TransactionCommit
         | RecordType::IndexCreate
+        | RecordType::IndexPage
+        | RecordType::IndexRoot
         | RecordType::DocumentIdWatermark
         | RecordType::VersionWatermark => Err(Error::Integrity(
             "non-mutation record appeared in a transaction".into(),
@@ -2402,15 +3115,16 @@ impl<'database> Transaction<'database> {
 
     /// Makes all staged mutations visible after one commit marker and file sync.
     pub fn commit(self) -> Result<()> {
-        self.database
-            .commit_transaction(self.id, &self.operations, &self.overlay)?;
-        self.apply_staged()
+        let index_batch =
+            self.database
+                .commit_transaction(self.id, &self.operations, &self.overlay)?;
+        self.apply_staged_with_index_batch(Some(index_batch))
     }
 
     /// Discards all staged changes. Provisional IDs can be reused after rollback.
     pub fn rollback(self) {}
 
-    fn apply_staged(self) -> Result<()> {
+    fn apply_staged_with_index_batch(self, index_batch: Option<PendingIndexBatch>) -> Result<()> {
         let Transaction {
             database,
             id,
@@ -2429,6 +3143,12 @@ impl<'database> Transaction<'database> {
             next_document_id,
             document_ids_exhausted,
         );
+        let result = result.and_then(|()| {
+            if let Some(batch) = index_batch {
+                database.publish_index_batch(id, batch)?;
+            }
+            Ok(())
+        });
         if result.is_err() {
             database.write_failed = true;
         }
@@ -2602,6 +3322,8 @@ enum RecordType {
     IndexCreate,
     DocumentIdWatermark,
     VersionWatermark,
+    IndexPage,
+    IndexRoot,
 }
 
 fn equality_terms(filter: &Filter) -> Vec<(&FieldPath, &Value)> {
@@ -2693,6 +3415,8 @@ impl RecordType {
             Self::IndexCreate => 7,
             Self::DocumentIdWatermark => 8,
             Self::VersionWatermark => 9,
+            Self::IndexPage => 10,
+            Self::IndexRoot => 11,
         }
     }
 
@@ -2707,6 +3431,8 @@ impl RecordType {
             7 => Ok(Self::IndexCreate),
             8 => Ok(Self::DocumentIdWatermark),
             9 => Ok(Self::VersionWatermark),
+            10 => Ok(Self::IndexPage),
+            11 => Ok(Self::IndexRoot),
             _ => Err(Error::Format(format!("unknown record type {code}"))),
         }
     }
@@ -2771,7 +3497,7 @@ fn encode_collection_create(collection_id: i64, name: &str) -> Result<Vec<u8>> {
     Ok(payload)
 }
 
-fn encode_index_definition(index: &SecondaryIndex) -> Result<Vec<u8>> {
+fn encode_index_definition(index: &SecondaryIndex, format_version: u16) -> Result<Vec<u8>> {
     if index.id.value() <= 0 || index.collection_id <= 0 {
         return Err(Error::Integrity(
             "index identifiers must be positive".into(),
@@ -2795,6 +3521,15 @@ fn encode_index_definition(index: &SecondaryIndex) -> Result<Vec<u8>> {
         }
         payload.extend_from_slice(&length.to_be_bytes());
         payload.extend_from_slice(segment.as_bytes());
+    }
+    if format_version >= PERSISTENT_INDEX_FORMAT_VERSION {
+        if index.root_page_id == 0 || index.root_page_id > i64::MAX as u64 {
+            return Err(Error::Integrity(
+                "persistent index definition must name a valid root page".into(),
+            ));
+        }
+        payload.extend_from_slice(&(index.root_page_id as i64).to_be_bytes());
+        payload.extend_from_slice(&(index.root_generation as i64).to_be_bytes());
     }
     Ok(payload)
 }
