@@ -471,4 +471,3 @@ fn seeded_mutations_keep_indexed_queries_equal_to_full_scan_before_and_after_reo
     let full_scan = Database::open(&full_scan_file.0).unwrap();
     assert_index_matches_full_scan(&indexed, &full_scan, seed);
 }
-
