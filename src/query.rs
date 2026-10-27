@@ -94,7 +94,7 @@ impl Query {
 }
 
 /// A planner decision exposed by [`crate::Database::explain`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum QueryPlan {
     PrimaryKeyLookup {
         collection: String,
@@ -104,6 +104,14 @@ pub enum QueryPlan {
         collection: String,
         index_id: i64,
         path: FieldPath,
+        unique: bool,
+    },
+    SecondaryIndexRangeLookup {
+        collection: String,
+        index_id: i64,
+        path: FieldPath,
+        operator: CompareOp,
+        value: Value,
         unique: bool,
     },
     FullScan {

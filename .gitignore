@@ -4,6 +4,7 @@
 
 # SeaWorld database files and transient files
 *.seaworld.db
+*.seaworld.db.*
 *.seaworld.db-*
 *.swdb-tmp
 *.swdb-tmp-*

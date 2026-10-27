@@ -6,6 +6,10 @@ pub enum Error {
     Io(io::Error),
     Randomness(getrandom::Error),
     Locked,
+    ReadOnly,
+    RecoveryRequired,
+    ActiveSnapshots,
+    LockPoisoned,
     Format(String),
     Integrity(String),
     InvalidInput(String),
@@ -28,6 +32,14 @@ impl fmt::Display for Error {
             Self::Io(error) => write!(formatter, "I/O error: {error}"),
             Self::Randomness(error) => write!(formatter, "could not generate database ID: {error}"),
             Self::Locked => formatter.write_str("database is already open for writing"),
+            Self::ReadOnly => formatter.write_str("database handle is read-only"),
+            Self::RecoveryRequired => {
+                formatter.write_str("database requires a writable open for recovery")
+            }
+            Self::ActiveSnapshots => {
+                formatter.write_str("operation is unavailable while snapshots are active")
+            }
+            Self::LockPoisoned => formatter.write_str("database snapshot state is unavailable"),
             Self::Format(message) => write!(formatter, "invalid database format: {message}"),
             Self::Integrity(message) => write!(formatter, "database integrity error: {message}"),
             Self::InvalidInput(message) => write!(formatter, "invalid input: {message}"),

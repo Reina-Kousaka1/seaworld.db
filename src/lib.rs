@@ -1,19 +1,23 @@
 //! Experimental embedded SeaWorld DB engine.
 //!
 //! The public API and the planned SQL adapter share one document-native engine. The
-//! V1 files remain compatible; new databases use V2 transaction records.
+//! V1/V2 files remain readable; new databases use V3 transaction records.
 
 mod codec;
 mod document;
 mod error;
 mod format;
 mod index;
+mod mvcc;
 mod query;
 mod storage;
 
 pub use document::{Document, MAX_DOCUMENT_BYTES, Value};
 pub use error::{Error, Result};
 pub use index::{FieldPath, IndexId, MAX_FIELD_PATH_DEPTH, MAX_INDEXES};
+pub use mvcc::{
+    CommitVersion, MAX_ACTIVE_SNAPSHOTS, MAX_MVCC_HISTORY_BYTES, Snapshot, SnapshotRow,
+};
 pub use query::{
     CompareOp, Filter, MAX_FILTER_DEPTH, MAX_FILTER_NODES, MAX_QUERY_RESULTS, Query, QueryPlan,
     QueryRow, SortDirection,

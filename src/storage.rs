@@ -4,6 +4,7 @@ use std::{
     fs::{self, File, OpenOptions, TryLockError},
     io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
+    sync::Arc,
     sync::atomic::{AtomicU64, Ordering as AtomicOrdering},
 };
 
@@ -12,10 +13,11 @@ use crate::{
     Result, Value,
     codec::{self, Cursor},
     format::{
-        self, FORMAT_VERSION, HEADER_SIZE, MAX_RECORD_SIZE, MIN_RECORD_SIZE, RECORD_MAGIC,
-        RECORD_PREFIX_SIZE, TRANSACTION_FORMAT_VERSION,
+        self, FORMAT_VERSION, HEADER_SIZE, MAX_RECORD_SIZE, MIN_RECORD_SIZE, MVCC_FORMAT_VERSION,
+        RECORD_MAGIC, RECORD_PREFIX_SIZE, TRANSACTION_FORMAT_VERSION,
     },
     index::{IndexValue, MAX_INDEXES, SecondaryIndex},
+    mvcc::{CommitVersion, MvccStore, Snapshot},
     query::{self, CompareOp, Filter, MAX_QUERY_RESULTS, SortDirection},
 };
 
@@ -25,9 +27,9 @@ pub const MAX_DATABASE_BYTES: u64 = format::MAX_DATABASE_SIZE_BYTES;
 pub const MAX_COLLECTIONS: usize = 10_000;
 /// Maximum active documents in one database.
 pub const MAX_DOCUMENTS: usize = 100_000;
-/// Maximum mutations permitted in one V2 transaction.
+/// Maximum mutations permitted in one V2/V3 transaction.
 pub const MAX_TRANSACTION_OPERATIONS: usize = 10_000;
-/// Maximum encoded mutation payload bytes in one V2 transaction.
+/// Maximum encoded mutation payload bytes in one V2/V3 transaction.
 pub const MAX_TRANSACTION_BYTES: usize = 64 * 1024 * 1024;
 
 const COLLECTION_NAME_MAX_BYTES: usize = 255;
@@ -53,11 +55,14 @@ struct CollectionState {
 
 /// Embedded database handle backed by a versioned SeaWorld append-only file.
 ///
-/// A handle owns an exclusive OS file lock. A write is durable only after its
-/// complete checksummed record has been synchronized successfully.
+/// A writer handle owns an exclusive sidecar lock. Each file append is protected
+/// by an OS lock on the database file and is durable after its checksummed bytes
+/// have been synchronized successfully.
 pub struct Database {
     path: PathBuf,
     file: File,
+    writer_lock: Option<File>,
+    writable: bool,
     database_id: [u8; 16],
     format_version: u16,
     collections: HashMap<String, CollectionState>,
@@ -73,11 +78,17 @@ pub struct Database {
     document_count: usize,
     write_failed: bool,
     recovery_report: RecoveryReport,
+    mvcc: Arc<MvccStore>,
 }
 
 impl Database {
     /// Creates a new database file and never overwrites an existing path.
     pub fn create(path: impl AsRef<Path>) -> Result<Self> {
+        Self::create_with_version(path.as_ref(), MVCC_FORMAT_VERSION)
+    }
+
+    /// Creates an explicit legacy V2 database for compatibility tooling.
+    pub fn create_v2(path: impl AsRef<Path>) -> Result<Self> {
         Self::create_with_version(path.as_ref(), TRANSACTION_FORMAT_VERSION)
     }
 
@@ -96,26 +107,36 @@ impl Database {
         format_version: u16,
     ) -> Result<Self> {
         let path = absolute_path(path)?;
+        let writer_lock = acquire_writer_lock(&path)?;
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
             .create_new(true)
             .open(&path)?;
-        acquire_lock(&file)?;
+        file.lock()?;
 
         let header = format::encode_header_version(database_id, format_version);
         file.write_all(&header)?;
         file.sync_all()?;
         sync_parent_directory(&path)?;
+        file.unlock()?;
 
-        Ok(Self::new(path, file, database_id, format_version))
+        Ok(Self::new(
+            path,
+            file,
+            Some(writer_lock),
+            true,
+            database_id,
+            format_version,
+        ))
     }
 
-    /// Opens a database, validates the file, and replays complete records.
+    /// Opens a database for writing, validates the file, and replays complete records.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = absolute_path(path.as_ref())?;
+        let writer_lock = acquire_writer_lock(&path)?;
         let mut file = OpenOptions::new().read(true).write(true).open(&path)?;
-        acquire_lock(&file)?;
+        file.lock()?;
         let file_size = file.metadata()?.len();
         if file_size > MAX_DATABASE_BYTES {
             return Err(Error::Format(
@@ -131,15 +152,66 @@ impl Database {
         let mut header = [0_u8; HEADER_SIZE];
         file.read_exact(&mut header)?;
         let decoded = format::decode_header(&header)?;
-        let mut database = Self::new(path, file, decoded.database_id, decoded.version);
+        let mut database = Self::new(
+            path,
+            file,
+            Some(writer_lock),
+            true,
+            decoded.database_id,
+            decoded.version,
+        );
         database.replay_records(file_size)?;
+        database.reset_mvcc_to_current()?;
+        database.file.unlock()?;
         Ok(database)
     }
 
-    fn new(path: PathBuf, file: File, database_id: [u8; 16], format_version: u16) -> Self {
+    /// Opens a fixed read-only view while a shared file lock prevents replay during an append.
+    pub fn open_reader(path: impl AsRef<Path>) -> Result<Self> {
+        let path = absolute_path(path.as_ref())?;
+        let mut file = File::open(&path)?;
+        file.lock_shared()?;
+        let file_size = file.metadata()?.len();
+        if file_size > MAX_DATABASE_BYTES {
+            return Err(Error::Format(
+                "database file exceeds the 128 MiB limit".into(),
+            ));
+        }
+        if file_size < HEADER_SIZE as u64 {
+            return Err(Error::Format(
+                "database file is shorter than its header".into(),
+            ));
+        }
+        let mut header = [0_u8; HEADER_SIZE];
+        file.read_exact(&mut header)?;
+        let decoded = format::decode_header(&header)?;
+        let mut database = Self::new(
+            path,
+            file,
+            None,
+            false,
+            decoded.database_id,
+            decoded.version,
+        );
+        database.replay_records(file_size)?;
+        database.reset_mvcc_to_current()?;
+        database.file.unlock()?;
+        Ok(database)
+    }
+
+    fn new(
+        path: PathBuf,
+        file: File,
+        writer_lock: Option<File>,
+        writable: bool,
+        database_id: [u8; 16],
+        format_version: u16,
+    ) -> Self {
         Self {
             path,
             file,
+            writer_lock,
+            writable,
             database_id,
             format_version,
             collections: HashMap::new(),
@@ -155,7 +227,32 @@ impl Database {
             document_count: 0,
             write_failed: false,
             recovery_report: RecoveryReport::default(),
+            mvcc: Arc::new(MvccStore::default()),
         }
+    }
+
+    fn reset_mvcc_to_current(&self) -> Result<()> {
+        let version = if self.format_version >= MVCC_FORMAT_VERSION {
+            CommitVersion::new(self.next_transaction_id.saturating_sub(1))
+        } else {
+            CommitVersion::new(0)
+        };
+        let collections: Vec<_> = self
+            .collections
+            .iter()
+            .map(|(name, collection)| (name.clone(), collection.id))
+            .collect();
+        let documents: Vec<_> = self
+            .collections
+            .values()
+            .flat_map(|collection| {
+                collection
+                    .documents
+                    .iter()
+                    .map(|(id, document)| (*id, collection.id, document.clone()))
+            })
+            .collect();
+        self.mvcc.reset(version, &collections, &documents)
     }
 
     /// Returns the normalized path used to open the database.
@@ -173,12 +270,28 @@ impl Database {
         self.format_version
     }
 
-    /// Starts a V2 transaction. V1 files must first be copied to V2.
+    /// Returns the current committed version ordinal.
+    pub fn current_version(&self) -> Result<CommitVersion> {
+        self.mvcc.current_version()
+    }
+
+    /// Begins a stable V3 read snapshot that can outlive a mutable writer borrow.
+    pub fn begin_read(&self) -> Result<Snapshot> {
+        if self.format_version != MVCC_FORMAT_VERSION {
+            return Err(Error::UpgradeRequired(
+                "write a V3 compacted copy before opening MVCC snapshots".into(),
+            ));
+        }
+        self.mvcc.snapshot()
+    }
+
+    /// Starts a V2/V3 transaction. V1 files must first be copied to V2 or V3.
     pub fn begin_transaction(&mut self) -> Result<Transaction<'_>> {
         self.check_usable()?;
-        if self.format_version != TRANSACTION_FORMAT_VERSION {
+        self.check_writable()?;
+        if self.format_version < TRANSACTION_FORMAT_VERSION {
             return Err(Error::UpgradeRequired(
-                "copy the V1 file to V2 before starting a transaction".into(),
+                "copy the V1 file to V2 or later before starting a transaction".into(),
             ));
         }
         if self.next_transaction_id <= 0 || self.next_transaction_id == i64::MAX {
@@ -195,7 +308,8 @@ impl Database {
 
     /// Persists a new collection and returns its database-local identifier.
     pub fn create_collection(&mut self, name: &str) -> Result<CollectionId> {
-        if self.format_version == TRANSACTION_FORMAT_VERSION {
+        self.check_writable()?;
+        if self.format_version >= TRANSACTION_FORMAT_VERSION {
             let mut transaction = self.begin_transaction()?;
             let id = transaction.create_collection(name)?;
             transaction.commit()?;
@@ -235,7 +349,8 @@ impl Database {
 
     /// Inserts a document and assigns the next positive database-local ID.
     pub fn insert(&mut self, collection_name: &str, document: Document) -> Result<DocumentId> {
-        if self.format_version == TRANSACTION_FORMAT_VERSION {
+        self.check_writable()?;
+        if self.format_version >= TRANSACTION_FORMAT_VERSION {
             let mut transaction = self.begin_transaction()?;
             let id = transaction.insert(collection_name, document)?;
             transaction.commit()?;
@@ -259,7 +374,8 @@ impl Database {
         id: DocumentId,
         document: Document,
     ) -> Result<()> {
-        if self.format_version == TRANSACTION_FORMAT_VERSION {
+        self.check_writable()?;
+        if self.format_version >= TRANSACTION_FORMAT_VERSION {
             let mut transaction = self.begin_transaction()?;
             transaction.insert_with_id(collection_name, id, document)?;
             transaction.commit()?;
@@ -306,7 +422,8 @@ impl Database {
         id: DocumentId,
         document: Document,
     ) -> Result<bool> {
-        if self.format_version == TRANSACTION_FORMAT_VERSION {
+        self.check_writable()?;
+        if self.format_version >= TRANSACTION_FORMAT_VERSION {
             let mut transaction = self.begin_transaction()?;
             let updated = transaction.update(collection_name, id, document)?;
             if updated {
@@ -333,7 +450,8 @@ impl Database {
 
     /// Deletes an existing document as one logged operation.
     pub fn delete(&mut self, collection_name: &str, id: DocumentId) -> Result<bool> {
-        if self.format_version == TRANSACTION_FORMAT_VERSION {
+        self.check_writable()?;
+        if self.format_version >= TRANSACTION_FORMAT_VERSION {
             let mut transaction = self.begin_transaction()?;
             let deleted = transaction.delete(collection_name, id)?;
             if deleted {
@@ -382,13 +500,13 @@ impl Database {
         Ok(names)
     }
 
-    /// Creates a persistent non-unique single-field index in V2.
+    /// Creates a persistent non-unique single-field index definition in V2 or V3.
     pub fn create_index(&mut self, collection_name: &str, path: &str) -> Result<IndexId> {
         let path = FieldPath::parse(path)?;
         self.create_index_path(collection_name, path, false)
     }
 
-    /// Creates a persistent unique single-field index in V2.
+    /// Creates a persistent unique single-field index definition in V2 or V3.
     pub fn create_unique_index(&mut self, collection_name: &str, path: &str) -> Result<IndexId> {
         let path = FieldPath::parse(path)?;
         self.create_index_path(collection_name, path, true)
@@ -401,6 +519,7 @@ impl Database {
         path: FieldPath,
         unique: bool,
     ) -> Result<IndexId> {
+        self.check_writable()?;
         self.check_usable()?;
         self.require_v2("indexes")?;
         let collection_id = self.collection_id(collection_name)?;
@@ -467,6 +586,25 @@ impl Database {
                 });
             }
         }
+        for (path, operator, value) in range_terms(query.filter()) {
+            if IndexValue::from_value(value).is_err() {
+                continue;
+            }
+            if let Some(index) = self
+                .secondary_indexes
+                .values()
+                .find(|index| index.collection_id == collection_id && index.path == *path)
+            {
+                return Ok(QueryPlan::SecondaryIndexRangeLookup {
+                    collection: query.collection().to_owned(),
+                    index_id: index.id.value(),
+                    path: index.path.clone(),
+                    operator,
+                    value: value.clone(),
+                    unique: index.unique,
+                });
+            }
+        }
         Ok(QueryPlan::FullScan {
             collection: query.collection().to_owned(),
         })
@@ -496,6 +634,18 @@ impl Database {
                     .get(index_id)
                     .and_then(|index| index.entries.get(&key))
                     .map(|ids| ids.iter().copied().collect())
+                    .unwrap_or_default()
+            }
+            QueryPlan::SecondaryIndexRangeLookup {
+                index_id,
+                operator,
+                value,
+                ..
+            } => {
+                let key = IndexValue::from_value(value)?;
+                self.secondary_indexes
+                    .get(index_id)
+                    .map(|index| index_range_candidates(index, &key, *operator))
                     .unwrap_or_default()
             }
             QueryPlan::FullScan { .. } => self
@@ -571,15 +721,20 @@ impl Database {
     }
 
     fn require_v2(&self, feature: &str) -> Result<()> {
-        if self.format_version != TRANSACTION_FORMAT_VERSION {
+        if self.format_version < TRANSACTION_FORMAT_VERSION {
             return Err(Error::UpgradeRequired(format!(
-                "write a V2 compacted copy before using {feature}"
+                "write a V2 or later compacted copy before using {feature}"
             )));
         }
         Ok(())
     }
 
-    fn commit_transaction(&mut self, id: i64, operations: &[StagedOperation]) -> Result<()> {
+    fn commit_transaction(
+        &mut self,
+        id: i64,
+        operations: &[StagedOperation],
+        overlay: &HashMap<i64, OverlayDocument>,
+    ) -> Result<()> {
         self.check_usable()?;
         self.require_v2("transactions")?;
         if id <= 0 || id != self.next_transaction_id || id == i64::MAX {
@@ -589,6 +744,16 @@ impl Database {
         }
         if operations.len() > MAX_TRANSACTION_OPERATIONS {
             return Err(Error::Limit("transaction operation limit exceeded".into()));
+        }
+        if self.format_version >= MVCC_FORMAT_VERSION {
+            let changes: Vec<_> = overlay
+                .iter()
+                .map(|(document_id, entry)| {
+                    (*document_id, entry.collection_id, entry.document.clone())
+                })
+                .collect();
+            self.mvcc
+                .ensure_commit_capacity(CommitVersion::new(id), &changes)?;
         }
 
         let mut blocks = Vec::with_capacity(operations.len() + 2);
@@ -639,7 +804,11 @@ impl Database {
             return Err(Error::Limit("database file size limit reached".into()));
         }
 
-        self.file.seek(SeekFrom::End(0))?;
+        self.file.lock()?;
+        if let Err(error) = self.file.seek(SeekFrom::End(0)) {
+            let _ = self.file.unlock();
+            return Err(Error::Io(error));
+        }
         let write_result = (|| -> std::io::Result<()> {
             crash_before_write();
             crash_transaction_at("transaction_before_begin");
@@ -679,7 +848,12 @@ impl Database {
             crash_transaction_at("transaction_after_sync_before_return");
             Ok(())
         })();
+        let unlock_result = self.file.unlock();
         if let Err(error) = write_result {
+            self.write_failed = true;
+            return Err(Error::Io(error));
+        }
+        if let Err(error) = unlock_result {
             self.write_failed = true;
             return Err(Error::Io(error));
         }
@@ -919,6 +1093,29 @@ impl Database {
         self.next_document_id = next_document_id;
         self.document_ids_exhausted = document_ids_exhausted;
         self.next_transaction_id = transaction_id + 1;
+        if self.format_version >= MVCC_FORMAT_VERSION {
+            let new_collections: Vec<_> = operations
+                .iter()
+                .filter_map(|operation| match operation {
+                    StagedOperation::CollectionCreate { id, name } => Some((name.clone(), *id)),
+                    _ => None,
+                })
+                .collect();
+            let changes: Vec<_> = overlay
+                .iter()
+                .map(|(document_id, entry)| {
+                    (*document_id, entry.collection_id, entry.document.clone())
+                })
+                .collect();
+            if let Err(error) = self.mvcc.apply_commit(
+                CommitVersion::new(transaction_id),
+                &new_collections,
+                &changes,
+            ) {
+                self.write_failed = true;
+                return Err(error);
+            }
+        }
         Ok(())
     }
 
@@ -931,6 +1128,12 @@ impl Database {
     /// database unchanged.
     pub fn write_compacted_copy(&self, target: impl AsRef<Path>) -> Result<()> {
         self.check_usable()?;
+        if self.format_version >= MVCC_FORMAT_VERSION {
+            if self.mvcc.has_active_snapshots()? {
+                return Err(Error::ActiveSnapshots);
+            }
+            return self.write_v3_compacted_copy(target);
+        }
         if self.format_version == TRANSACTION_FORMAT_VERSION {
             return self.write_v2_compacted_copy(target);
         }
@@ -1035,6 +1238,23 @@ impl Database {
     /// secondary index definitions, and the document-ID high-water mark. The
     /// destination is published without overwriting an existing path.
     pub fn write_v2_compacted_copy(&self, target: impl AsRef<Path>) -> Result<()> {
+        self.write_transactional_compacted_copy(target, TRANSACTION_FORMAT_VERSION)
+    }
+
+    /// Writes a V3 snapshot preserving the source commit-version watermark.
+    /// Active snapshots must be released before compaction can proceed.
+    pub fn write_v3_compacted_copy(&self, target: impl AsRef<Path>) -> Result<()> {
+        if self.mvcc.has_active_snapshots()? {
+            return Err(Error::ActiveSnapshots);
+        }
+        self.write_transactional_compacted_copy(target, MVCC_FORMAT_VERSION)
+    }
+
+    fn write_transactional_compacted_copy(
+        &self,
+        target: impl AsRef<Path>,
+        target_version: u16,
+    ) -> Result<()> {
         self.check_usable()?;
         let target = absolute_path(target.as_ref())?;
         if target == self.path {
@@ -1051,11 +1271,8 @@ impl Database {
 
         let temporary = temporary_sibling_path(&target)?;
         let write_result = (|| -> Result<()> {
-            let mut copy = Self::create_with_identity(
-                &temporary,
-                self.database_id,
-                TRANSACTION_FORMAT_VERSION,
-            )?;
+            let mut copy =
+                Self::create_with_identity(&temporary, self.database_id, target_version)?;
             let mut collections: Vec<_> = self
                 .collection_names_by_id
                 .iter()
@@ -1137,13 +1354,30 @@ impl Database {
             let mut watermark = self.next_document_id.to_be_bytes().to_vec();
             watermark.push(u8::from(self.document_ids_exhausted));
             copy.append_record(RecordType::DocumentIdWatermark, &watermark)?;
+            if target_version >= MVCC_FORMAT_VERSION {
+                let source_version = if self.format_version >= MVCC_FORMAT_VERSION {
+                    self.mvcc.current_version()?.value()
+                } else {
+                    0
+                };
+                let committed_version = source_version.max(copy.next_transaction_id - 1);
+                if committed_version > 0 {
+                    copy.append_record(
+                        RecordType::VersionWatermark,
+                        &committed_version.to_be_bytes(),
+                    )?;
+                }
+            }
             copy.close()?;
             Ok(())
         })();
         if let Err(error) = write_result {
             let _ = fs::remove_file(&temporary);
+            let _ = fs::remove_file(sidecar_path(&temporary, ".writer.lock")?);
             return Err(error);
         }
+
+        let _ = fs::remove_file(sidecar_path(&temporary, ".writer.lock")?);
 
         if let Err(error) = fs::hard_link(&temporary, &target) {
             let _ = fs::remove_file(&temporary);
@@ -1158,10 +1392,14 @@ impl Database {
         Ok(())
     }
 
-    /// Synchronizes the database and releases its exclusive file lock.
+    /// Synchronizes a writable handle and releases its exclusive writer lock.
     pub fn close(self) -> Result<()> {
-        let sync_result = self.file.sync_all();
-        let unlock_result = self.file.unlock();
+        let sync_result = if self.writable {
+            self.file.sync_all()
+        } else {
+            Ok(())
+        };
+        let unlock_result = self.writer_lock.as_ref().map_or(Ok(()), File::unlock);
         match (sync_result, unlock_result) {
             (Err(error), _) => Err(Error::Io(error)),
             (Ok(()), Err(error)) => Err(Error::Io(error)),
@@ -1430,6 +1668,14 @@ impl Database {
                     }
                     self.replay_document_id_watermark(payload)?;
                 }
+                RecordType::VersionWatermark => {
+                    if self.format_version < MVCC_FORMAT_VERSION || pending.is_some() {
+                        return Err(Error::Integrity(
+                            "version watermark is invalid in this file or transaction".into(),
+                        ));
+                    }
+                    self.replay_version_watermark(payload)?;
+                }
             }
 
             self.next_sequence += 1;
@@ -1610,12 +1856,29 @@ impl Database {
         Ok(())
     }
 
+    fn replay_version_watermark(&mut self, payload: &[u8]) -> Result<()> {
+        let mut input = Cursor::new(payload);
+        let committed_version = input.i64("committed version watermark")?;
+        input.finish("version watermark record")?;
+        let current = self.next_transaction_id.saturating_sub(1);
+        if committed_version < current || committed_version <= 0 || committed_version == i64::MAX {
+            return Err(Error::Integrity(
+                "version watermark is invalid or moves backwards".into(),
+            ));
+        }
+        self.next_transaction_id = committed_version + 1;
+        Ok(())
+    }
+
     fn recover_v2_tail(
         &mut self,
         last_good_offset: u64,
         sequence: i64,
         original_size: u64,
     ) -> Result<()> {
+        if !self.writable {
+            return Err(Error::RecoveryRequired);
+        }
         self.file.set_len(last_good_offset)?;
         crash_pause_if("recovery_after_truncate_before_sync");
         self.file.sync_all()?;
@@ -1726,7 +1989,8 @@ impl Database {
             RecordType::TransactionBegin
             | RecordType::TransactionCommit
             | RecordType::IndexCreate
-            | RecordType::DocumentIdWatermark => {
+            | RecordType::DocumentIdWatermark
+            | RecordType::VersionWatermark => {
                 return Err(Error::Format(
                     "version 2 record type cannot appear in a version 1 database".into(),
                 ));
@@ -1736,6 +2000,9 @@ impl Database {
     }
 
     fn recover_incomplete_tail(&mut self, last_good_offset: u64, original_size: u64) -> Result<()> {
+        if !self.writable {
+            return Err(Error::RecoveryRequired);
+        }
         self.file.set_len(last_good_offset)?;
         self.file.sync_all()?;
         self.recovery_report = RecoveryReport {
@@ -1745,6 +2012,7 @@ impl Database {
     }
 
     fn append_record(&mut self, record_type: RecordType, payload: &[u8]) -> Result<()> {
+        self.check_writable()?;
         if self.next_sequence <= 0 || self.next_sequence == i64::MAX {
             return Err(Error::Limit("record sequence space is exhausted".into()));
         }
@@ -1766,7 +2034,11 @@ impl Database {
             ));
         }
         let block = encode_record(record_type, self.next_sequence, payload)?;
-        self.file.seek(SeekFrom::End(0))?;
+        self.file.lock()?;
+        if let Err(error) = self.file.seek(SeekFrom::End(0)) {
+            let _ = self.file.unlock();
+            return Err(Error::Io(error));
+        }
         let write_result = (|| -> std::io::Result<()> {
             crash_before_write();
             if crash_during_write() {
@@ -1779,7 +2051,12 @@ impl Database {
             crash_after_sync();
             Ok(())
         })();
+        let unlock_result = self.file.unlock();
         if let Err(error) = write_result {
+            self.write_failed = true;
+            return Err(Error::Io(error));
+        }
+        if let Err(error) = unlock_result {
             self.write_failed = true;
             return Err(Error::Io(error));
         }
@@ -1820,9 +2097,16 @@ impl Database {
         }
         Ok(())
     }
+
+    fn check_writable(&self) -> Result<()> {
+        if !self.writable {
+            return Err(Error::ReadOnly);
+        }
+        Ok(())
+    }
 }
 
-/// A staged V2 transaction. Changes become visible only after its commit marker syncs.
+/// A staged V2/V3 transaction. Changes become visible only after its commit marker syncs.
 pub struct Transaction<'database> {
     database: &'database mut Database,
     id: i64,
@@ -1951,7 +2235,8 @@ fn decode_staged_operation(record_type: RecordType, payload: &[u8]) -> Result<St
         RecordType::TransactionBegin
         | RecordType::TransactionCommit
         | RecordType::IndexCreate
-        | RecordType::DocumentIdWatermark => Err(Error::Integrity(
+        | RecordType::DocumentIdWatermark
+        | RecordType::VersionWatermark => Err(Error::Integrity(
             "non-mutation record appeared in a transaction".into(),
         )),
     }
@@ -2118,7 +2403,7 @@ impl<'database> Transaction<'database> {
     /// Makes all staged mutations visible after one commit marker and file sync.
     pub fn commit(self) -> Result<()> {
         self.database
-            .commit_transaction(self.id, &self.operations)?;
+            .commit_transaction(self.id, &self.operations, &self.overlay)?;
         self.apply_staged()
     }
 
@@ -2316,6 +2601,7 @@ enum RecordType {
     TransactionCommit,
     IndexCreate,
     DocumentIdWatermark,
+    VersionWatermark,
 }
 
 fn equality_terms(filter: &Filter) -> Vec<(&FieldPath, &Value)> {
@@ -2339,6 +2625,62 @@ fn equality_terms(filter: &Filter) -> Vec<(&FieldPath, &Value)> {
     values
 }
 
+fn range_terms(filter: &Filter) -> Vec<(&FieldPath, CompareOp, &Value)> {
+    fn collect<'a>(filter: &'a Filter, values: &mut Vec<(&'a FieldPath, CompareOp, &'a Value)>) {
+        match filter {
+            Filter::Compare { path, op, value }
+                if matches!(
+                    op,
+                    CompareOp::Lt | CompareOp::Lte | CompareOp::Gt | CompareOp::Gte
+                ) =>
+            {
+                values.push((path, *op, value));
+            }
+            Filter::And(children) => {
+                for child in children {
+                    collect(child, values);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut values = Vec::new();
+    collect(filter, &mut values);
+    values
+}
+
+fn index_range_candidates(
+    index: &SecondaryIndex,
+    key: &IndexValue,
+    operator: CompareOp,
+) -> Vec<DocumentId> {
+    use std::ops::Bound::{Excluded, Unbounded};
+
+    match operator {
+        CompareOp::Lt => index
+            .entries
+            .range(..key.clone())
+            .flat_map(|(_, ids)| ids.iter().copied())
+            .collect(),
+        CompareOp::Lte => index
+            .entries
+            .range(..=key.clone())
+            .flat_map(|(_, ids)| ids.iter().copied())
+            .collect(),
+        CompareOp::Gt => index
+            .entries
+            .range((Excluded(key.clone()), Unbounded))
+            .flat_map(|(_, ids)| ids.iter().copied())
+            .collect(),
+        CompareOp::Gte => index
+            .entries
+            .range(key.clone()..)
+            .flat_map(|(_, ids)| ids.iter().copied())
+            .collect(),
+        CompareOp::Eq | CompareOp::Ne => Vec::new(),
+    }
+}
+
 impl RecordType {
     const fn code(self) -> u8 {
         match self {
@@ -2350,6 +2692,7 @@ impl RecordType {
             Self::TransactionCommit => 6,
             Self::IndexCreate => 7,
             Self::DocumentIdWatermark => 8,
+            Self::VersionWatermark => 9,
         }
     }
 
@@ -2363,6 +2706,7 @@ impl RecordType {
             6 => Ok(Self::TransactionCommit),
             7 => Ok(Self::IndexCreate),
             8 => Ok(Self::DocumentIdWatermark),
+            9 => Ok(Self::VersionWatermark),
             _ => Err(Error::Format(format!("unknown record type {code}"))),
         }
     }
@@ -2489,7 +2833,7 @@ fn decode_document_mutation(input: &mut Cursor<'_>) -> Result<(i64, i64, Documen
     Ok((collection_id, document_id, document))
 }
 
-fn validate_collection_name(name: &str) -> Result<()> {
+pub(crate) fn validate_collection_name(name: &str) -> Result<()> {
     let bytes = name.as_bytes();
     if bytes.is_empty() || bytes.len() > 63 || !bytes[0].is_ascii_alphabetic() && bytes[0] != b'_' {
         return Err(Error::InvalidInput(
@@ -2511,11 +2855,22 @@ fn absolute_path(path: &Path) -> Result<PathBuf> {
     if path.as_os_str().is_empty() {
         return Err(Error::InvalidInput("database path cannot be empty".into()));
     }
-    Ok(if path.is_absolute() {
+    let absolute = if path.is_absolute() {
         path.to_path_buf()
     } else {
         std::env::current_dir()?.join(path)
-    })
+    };
+    if absolute.exists() {
+        return Ok(fs::canonicalize(absolute)?);
+    }
+    let parent = absolute
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let file_name = absolute
+        .file_name()
+        .ok_or_else(|| Error::InvalidInput("database path needs a file name".into()))?;
+    Ok(fs::canonicalize(parent)?.join(file_name))
 }
 
 fn temporary_sibling_path(target: &Path) -> Result<PathBuf> {
@@ -2532,9 +2887,28 @@ fn temporary_sibling_path(target: &Path) -> Result<PathBuf> {
     Ok(parent.join(temporary_name))
 }
 
-fn acquire_lock(file: &File) -> Result<()> {
+fn sidecar_path(path: &Path, suffix: &str) -> Result<PathBuf> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| Error::InvalidInput("database path needs a file name".into()))?;
+    let mut lock_name = file_name.to_os_string();
+    lock_name.push(suffix);
+    Ok(parent.join(lock_name))
+}
+
+fn acquire_writer_lock(path: &Path) -> Result<File> {
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(sidecar_path(path, ".writer.lock")?)?;
     match file.try_lock() {
-        Ok(()) => Ok(()),
+        Ok(()) => Ok(file),
         Err(TryLockError::WouldBlock) => Err(Error::Locked),
         Err(TryLockError::Error(error)) => Err(Error::Io(error)),
     }

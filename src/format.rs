@@ -9,6 +9,7 @@ pub(crate) const MAX_RECORD_SIZE: usize = 17 * 1024 * 1024;
 pub(crate) const MAX_DATABASE_SIZE_BYTES: u64 = 128 * 1024 * 1024;
 pub(crate) const FORMAT_VERSION: u16 = 1;
 pub(crate) const TRANSACTION_FORMAT_VERSION: u16 = 2;
+pub(crate) const MVCC_FORMAT_VERSION: u16 = 3;
 pub(crate) const HEADER_MAGIC: &[u8; 8] = b"SWDB\r\n\x1a\n";
 pub(crate) const RECORD_MAGIC: &[u8; 4] = b"SWBL";
 
@@ -45,7 +46,10 @@ pub(crate) fn decode_header(bytes: &[u8]) -> Result<FileHeader> {
         return Err(Error::Format("invalid SeaWorld magic bytes".into()));
     }
     let version = u16::from_be_bytes(bytes[8..10].try_into().expect("fixed header range"));
-    if version != FORMAT_VERSION && version != TRANSACTION_FORMAT_VERSION {
+    if version != FORMAT_VERSION
+        && version != TRANSACTION_FORMAT_VERSION
+        && version != MVCC_FORMAT_VERSION
+    {
         return Err(Error::Format(format!(
             "unsupported format version {version}"
         )));

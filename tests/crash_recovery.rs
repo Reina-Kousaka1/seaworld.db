@@ -78,6 +78,10 @@ fn empty_database(path: &PathBuf) {
     Database::create(path).unwrap().close().unwrap();
 }
 
+fn empty_v2_database(path: &PathBuf) {
+    Database::create_v2(path).unwrap().close().unwrap();
+}
+
 #[test]
 fn killed_before_append_keeps_database_unchanged() {
     let temp = TempDatabase::new();
@@ -153,6 +157,7 @@ fn incomplete_v2_transactions_recover_without_partial_visibility() {
             database.collection_names().unwrap().is_empty(),
             "partial transaction leaked a collection at {point}"
         );
+        assert_eq!(database.current_version().unwrap().value(), 0);
         if point != "transaction_before_begin" {
             assert!(
                 database.recovery_report().discarded_bytes() > 0,
@@ -178,11 +183,37 @@ fn complete_commit_marker_recovers_the_whole_transaction() {
         assert!(!kill_writer(&temp, point).success(), "point {point}");
         let database = Database::open(temp.path()).unwrap();
         assert_eq!(database.collection_names().unwrap(), ["users"]);
+        assert_eq!(database.current_version().unwrap().value(), 1);
         assert_eq!(
             database.document_ids("users").unwrap(),
             [DocumentId::new(1).unwrap(), DocumentId::new(2).unwrap()]
         );
     }
+}
+
+#[test]
+fn legacy_v2_transaction_tail_recovery_remains_supported() {
+    let interrupted = TempDatabase::new();
+    empty_v2_database(interrupted.path());
+    assert!(!kill_writer(&interrupted, "transaction_after_begin").success());
+    let recovered = Database::open(interrupted.path()).unwrap();
+    assert!(recovered.collection_names().unwrap().is_empty());
+    assert!(recovered.recovery_report().discarded_bytes() > 0);
+    recovered.close().unwrap();
+    assert!(
+        Database::open(interrupted.path())
+            .unwrap()
+            .collection_names()
+            .unwrap()
+            .is_empty()
+    );
+
+    let committed = TempDatabase::new();
+    empty_v2_database(committed.path());
+    assert!(!kill_writer(&committed, "transaction_after_sync_before_return").success());
+    let recovered = Database::open(committed.path()).unwrap();
+    assert_eq!(recovered.collection_names().unwrap(), ["users"]);
+    assert_eq!(recovered.document_ids("users").unwrap().len(), 2);
 }
 
 #[test]
