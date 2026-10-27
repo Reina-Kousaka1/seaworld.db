@@ -17,7 +17,7 @@ Arrays and nested objects are first-class values. The first format stores object
 
 ## Bounds
 
-The initial decoder uses explicit limits: 16 MiB per document, 17 MiB per record block, 128 MiB per database file, nesting depth 64, at most 100,000 values per container and active documents per database, 10,000 collections per database, 1,024 UTF-8 bytes per field name, and 63 ASCII characters per collection name. Limits are checked before allocating from disk-supplied lengths. Invalid UTF-8, duplicate object keys, invalid numeric encodings, and trailing bytes are reported as data errors. There is no compaction yet, so the append-only file limit applies even when documents have been deleted or replaced many times.
+The initial decoder uses explicit limits: 16 MiB per document, 17 MiB per record block, 128 MiB per database file, nesting depth 64, at most 100,000 values per container and active documents per database, 10,000 collections per database, 1,024 UTF-8 bytes per field name, and 63 ASCII characters per collection name. Limits are checked before allocating from disk-supplied lengths. Invalid UTF-8, duplicate object keys, invalid numeric encodings, and trailing bytes are reported as data errors. The engine can write a compacted copy containing active documents, but it does not replace the open source file or switch paths automatically. The source append-log limit therefore remains in effect until an application explicitly opens the copy.
 
 These limits are protective initial defaults, not a long-term resource-governance system. They will need review against larger workloads before the file format stabilizes.
 

@@ -100,10 +100,11 @@ fn raw_empty_document_insert(collection_id: i64, document_id: i64) -> Vec<u8> {
 fn create_database_writes_a_valid_64_byte_header() {
     let temp = TempDatabase::new();
     let database = Database::create(&temp.path).unwrap();
+    let database_id = database.database_id();
+    database.close().unwrap();
     assert_eq!(fs::metadata(&temp.path).unwrap().len(), 64);
     assert_eq!(&fs::read(&temp.path).unwrap()[..8], b"SWDB\r\n\x1a\n");
-    assert_ne!(database.database_id(), [0; 16]);
-    database.close().unwrap();
+    assert_ne!(database_id, [0; 16]);
 }
 
 #[test]
@@ -476,4 +477,62 @@ fn non_finite_float_values_are_rejected() {
 fn negative_document_ids_are_rejected() {
     assert!(matches!(DocumentId::new(0), Err(Error::InvalidInput(_))));
     assert!(matches!(DocumentId::new(-1), Err(Error::InvalidInput(_))));
+}
+
+#[test]
+fn compacted_copy_preserves_live_data_and_does_not_replace_the_source() {
+    let source = TempDatabase::new();
+    let target = TempDatabase::new();
+    let mut database = Database::create(&source.path).unwrap();
+    database.create_collection("users").unwrap();
+    let id = DocumentId::new(42).unwrap();
+    database
+        .insert_with_id("users", id, sample_document())
+        .unwrap();
+    for credits in [2_000, 3_000, 4_000] {
+        let updated = sample_document().with("credits", Value::Integer(credits));
+        assert!(database.update("users", id, updated).unwrap());
+    }
+    let deleted_id = database.insert("users", Document::empty()).unwrap();
+    assert!(database.delete("users", deleted_id).unwrap());
+    database.close().unwrap();
+    let source_bytes = fs::read(&source.path).unwrap();
+    let database = Database::open(&source.path).unwrap();
+    let database_id = database.database_id();
+
+    database.write_compacted_copy(&target.path).unwrap();
+
+    database.close().unwrap();
+    assert_eq!(fs::read(&source.path).unwrap(), source_bytes);
+    assert!(fs::metadata(&target.path).unwrap().len() < source_bytes.len() as u64);
+    let compacted = Database::open(&target.path).unwrap();
+    assert_eq!(compacted.database_id(), database_id);
+    assert_eq!(compacted.document_ids("users").unwrap(), [id]);
+    assert_eq!(
+        compacted.get("users", id).unwrap(),
+        Some(&sample_document().with("credits", Value::Integer(4_000)))
+    );
+}
+
+#[test]
+fn compacted_copy_never_overwrites_its_destination_or_source() {
+    let source = TempDatabase::new();
+    let target = TempDatabase::new();
+    let mut database = Database::create(&source.path).unwrap();
+    database.create_collection("users").unwrap();
+    File::create(&target.path)
+        .unwrap()
+        .write_all(b"preserve destination")
+        .unwrap();
+    assert!(matches!(
+        database.write_compacted_copy(&target.path),
+        Err(Error::Duplicate(_))
+    ));
+    assert_eq!(fs::read(&target.path).unwrap(), b"preserve destination");
+    assert!(matches!(
+        database.write_compacted_copy(&source.path),
+        Err(Error::InvalidInput(_))
+    ));
+    database.close().unwrap();
+    assert_eq!(&fs::read(&source.path).unwrap()[..8], b"SWDB\r\n\x1a\n");
 }

@@ -8,7 +8,7 @@ An incomplete final block is discarded with an explicit recovery report. A compl
 
 ## Not provided yet
 
-The first version does not provide multi-operation transactions, rollback, snapshot isolation, serializable isolation, MVCC, concurrent writers, checkpoints, or a separate WAL. It does not claim full ACID. A single operation block is a replay unit, not a complete transaction protocol.
+The first version does not provide multi-operation transactions, rollback, snapshot isolation, serializable isolation, MVCC, concurrent writers, checkpoints, or a separate WAL. It does not claim full ACID. A single operation block is a replay unit, not a complete transaction protocol. Compacted-copy creation writes a second file and leaves the active source untouched; it is not a transaction checkpoint or an in-place log replacement.
 
 The append-only record stream is the primary storage log, so it serves as a simple journal. Future page-based storage should use a real WAL or another design with equivalent write-ahead ordering, commit markers, checksummed records, checkpointing, and bounded recovery.
 

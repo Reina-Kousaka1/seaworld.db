@@ -54,7 +54,7 @@ The query engine will consume SeaWorld's own query representation. Adapters tran
 
 ## Modules
 
-- **Storage engine:** owns file creation/opening, the versioned header, append-only record blocks, checksums, bounded reads, `File::sync_all` durability calls, exclusive OS file locks, and recovery of an incomplete tail.
+- **Storage engine:** owns file creation/opening, the versioned header, append-only record blocks, checksums, bounded reads, `File::sync_all` durability calls, exclusive OS file locks, recovery of an incomplete tail, and writing compacted copies without replacing the source file.
 - **Document model:** defines null, boolean, signed 64-bit integer, finite floating point, UTF-8 string, binary, array, and object values. Nested objects and arrays are ordinary values, not a SQL-only feature.
 - **Collections:** group documents and persist collection metadata. Document IDs are stable, positive 64-bit identifiers within a database.
 - **Index engine:** the first in-memory primary ID map is rebuilt by replaying the file. Single-field and unique indexes are future work.

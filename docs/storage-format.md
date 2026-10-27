@@ -50,6 +50,10 @@ Each successful mutation appends one complete operation block and calls `File::s
 
 The Rust test-only `crash-test` feature enables a separate `crash_writer` process with termination points before a block write, partway through a block, after a complete write but before sync, and after sync but before returning. The feature is disabled in release builds unless explicitly requested.
 
+## Compacted copies
+
+`write_compacted_copy` creates a new version 1 file containing the existing collections and only their active documents. It preserves the database UUID and document/collection IDs, and starts a fresh record sequence at 1. The open source file remains unchanged. The engine writes and synchronizes a same-directory temporary file, then publishes it through an atomic no-overwrite hard link and synchronizes the directory where supported. The destination filesystem must support hard links. There is no in-place replacement, automatic path switch, or compaction recovery protocol yet; the caller explicitly opens the new file and decides when to retire the old one.
+
 ## Format evolution
 
 - Reject unsupported major versions and unknown required flags.

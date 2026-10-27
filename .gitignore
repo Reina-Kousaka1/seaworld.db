@@ -8,6 +8,7 @@
 *.seaworld.db
 *.seaworld.db-*
 *.swdb-tmp
+*.swdb-tmp-*
 
 # IDE and OS metadata
 .idea/
