@@ -1,287 +1,700 @@
-YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éí×_6í:-jZ.¶›­–)Ş³WW6R7FC£§°¢6öÆÆV7F–öç3£§´%G&VTÖÂ†6„ÖÒÀ¢g3£§·6VÆbÂf–ÆRÂ÷Vä÷F–öç2ÂG'”Æö6´W'&÷'ÒÀ¢–ó£§µ&VBÂ6VV²Â6VV´g&öÒÂw&—FWÒÀ¢Fƒ£§µF‚ÂF„'VgÒÀ¢7–æ3£¦FöÖ–3£§´FöÖ–5ScBÂ÷&FW&–æwÒÀ§Ó° §W6R7&FS£§°¢6öÆÆV7F–öä–BÂFö7VÖVçBÂFö7VÖVçD–BÂW'&÷"Â&W7VÇBÀ¢6öFV3£§·6VÆbÂ7W'6÷'ÒÀ¢f÷&ÖC£§°¢6VÆbÂ„TDU%õ4•¤RÂÔ…õ$T4õ$Eõ4•¤RÂÔ”åõ$T4õ$Eõ4•¤RÂ$T4õ$EôÔt”2Â$T4õ$Eõ$Td•…õ4•¤RÀ¢ÒÀ§Ó° ¢òòòÖ†–×VÒ7W÷'FVBf–ÆR6—¦Rf÷"fW'6–öâà§V"6öç7BÔ…ôDD$4Uô%•DU3¢ScBÒf÷&ÖC£¤Ô…ôDD$4Uõ4•¤Uô%•DU3°¢òòòÖ†–×VÒ7F—fR6öÆÆV7F–öç2–âöæRFF&6Rà§V"6öç7BÔ…ô4ôÄÄT5D”ôå3¢W6—¦RÒó°¢òòòÖ†–×VÒ7F—fRFö7VÖVçG2–âöæRFF&6Rà§V"6öç7BÔ…ôDô5TÔTåE3¢W6—¦RÒó° ¦6öç7B4ôÄÄT5D”ôåôäÔUôÔ…ô%•DU3¢W6—¦RÒ#SS°§7FF–2äU…Eô4ôÕ5D”ôåõDTÕô”C¢FöÖ–5ScBÒFöÖ–5ScC£¦æWrƒ“° ¢òòòçVÖ&W"öb'—FW2F—66&FVBg&öÒâ–æ6ö×ÆWFRf–æÂ&V6÷&Bv†–ÆR÷Væ–ærà¢5¶FW&—fR„FV'VrÂ6ÆöæRÂ6÷’ÂFVfVÇBÂ'F–ÄWÂW•Ğ§V"7G'V7B&V6÷fW'•&W÷'B°¢F—66&FVEö'—FW3¢ScBÀ§Ğ ¦–×Â&V6÷fW'•&W÷'B°¢òòò&WGW&ç2F†RçVÖ&W"öb'—FW2&VÖ÷fVBg&öÒâ–æ6ö×ÆWFRf–æÂ&V6÷&Bà¢V"6öç7BfâF—66&FVEö'—FW2‡6VÆb’ÓâScB°¢6VÆbæF—66&FVEö'—FW0¢Ğ§Ğ §7G'V7B6öÆÆV7F–öå7FFR°¢–C¢“cBÀ¢Fö7VÖVçG3¢%G&VTÖÆ“cBÂFö7VÖVçCâÀ§Ğ ¢òòòVÖ&VFFVBFF&6R†æFÆR&6¶VB'’6Vv÷&ÆBw2fW'6–öâVæBÖöæÇ’f–ÆRà¢òòğ¢òòò†æFÆR÷vç2âW†6ÇW6—fRõ2f–ÆRÆö6²âw&—FR—2GW&&ÆRöæÇ’gFW"—G0¢òòò6ö×ÆWFR6†V6·7VÖÖVB&V6÷&B†2&VVâ7–æ6‡&öæ—¦VB7V66W76gVÆÇ’à§V"7G'V7BFF&6R°¢Fƒ¢F„'VbÀ¢f–ÆS¢f–ÆRÀ¢FF&6Uö–C¢·Sƒ²eÒÀ¢6öÆÆV7F–öç3¢†6„ÖÅ7G&–ærÂ6öÆÆV7F–öå7FFSâÀ¢6öÆÆV7F–öåöæÖW5ö'•ö–C¢†6„ÖÆ“cBÂ7G&–æsâÀ¢&–Ö'•ö–Eö–æFWƒ¢†6„ÖÆ“cBÂ“cCâÀ¢æW‡E÷6WVVæ6S¢“cBÀ¢æW‡Eö6öÆÆV7F–öåö–C¢“cBÀ¢æW‡EöFö7VÖVçEö–C¢“cBÀ¢Fö7VÖVçEö–G5öW††W7FVC¢&ööÂÀ¢Fö7VÖVçEö6÷VçC¢W6—¦RÀ¢w&—FUöf–ÆVC¢&ööÂÀ¢&V6÷fW'•÷&W÷'C¢&V6÷fW'•&W÷'BÀ§Ğ ¦–×ÂFF&6R°¢òòò7&VFW2æWrFF&6Rf–ÆRæBæWfW"÷fW'w&—FW2âW†—7F–ærF‚à¢V"fâ7&VFR‡Fƒ¢–×Â5&VcÅFƒâ’Óâ&W7VÇCÅ6VÆcâ°¢ÆWBF‚Ò'6öÇWFU÷F‚‡F‚æ5÷&Vb‚’“ó°¢ÆWB×WBf–ÆRÒ÷Vä÷F–öç3£¦æWr‚¢ç&VB‡G'VR¢çw&—FR‡G'VR¢æ7&VFUöæWr‡G'VR¢æ÷Vâ‚gF‚“ó°¢7V—&UöÆö6²‚ff–ÆR“ó° ¢ÆWBFF&6Uö–BÒ&æFöÕöFF&6Uö–B‚“ó°¢ÆWB†VFW"Òf÷&ÖC£¦Væ6öFUö†VFW"†FF&6Uö–B“°¢f–ÆRçw&—FUöÆÂ‚f†VFW"“ó°¢f–ÆRç7–æ5öÆÂ‚“ó°¢7–æ5÷&VçEöF—&V7F÷'’‚gF‚“ó° ¢ö²…6VÆc£¦æWr‡F‚Âf–ÆRÂFF&6Uö–B’¢Ğ ¢òòò÷Vç2FF&6RÂfÆ–FFW2F†Rf–ÆRÂæB&WÆ—26ö×ÆWFR&V6÷&G2à¢V"fâ÷Vâ‡Fƒ¢–×Â5&VcÅFƒâ’Óâ&W7VÇCÅ6VÆcâ°¢ÆWBF‚Ò'6öÇWFU÷F‚‡F‚æ5÷&Vb‚’“ó°¢ÆWB×WBf–ÆRÒ÷Vä÷F–öç3£¦æWr‚’ç&VB‡G'VR’çw&—FR‡G'VR’æ÷Vâ‚gF‚“ó°¢7V—&UöÆö6²‚ff–ÆR“ó°¢ÆWBf–ÆU÷6—¦RÒf–ÆRæÖWFFF‚“òæÆVâ‚“°¢–bf–ÆU÷6—¦RâÔ…ôDD$4Uô%•DU2°¢&WGW&âW'"„W'&÷#£¤f÷&ÖB€¢&FF&6Rf–ÆRW†6VVG2F†R#‚Ö”"Æ–Ö—B"æ–çFò‚’À¢’“°¢Ğ¢–bf–ÆU÷6—¦RÂ„TDU%õ4•¤R2ScB°¢&WGW&âW'"„W'&÷#£¤f÷&ÖB€¢&FF&6Rf–ÆR—26†÷'FW"F†â—G2†VFW""æ–çFò‚’À¢’“°¢Ğ ¢ÆWB×WB†VFW"Ò³÷Sƒ²„TDU%õ4•¤UÓ°¢f–ÆRç&VEöW†7B‚f×WB†VFW"“ó°¢ÆWBFF&6Uö–BÒf÷&ÖC£¦FV6öFUö†VFW"‚f†VFW"“ó°¢ÆWB×WBFF&6RÒ6VÆc£¦æWr‡F‚Âf–ÆRÂFF&6Uö–B“°¢FF&6Rç&WÆ•÷&V6÷&G2†f–ÆU÷6—¦R“ó°¢ö²†FF&6R¢Ğ ¢fâæWr‡Fƒ¢F„'VbÂf–ÆS¢f–ÆRÂFF&6Uö–C¢·Sƒ²eÒ’Óâ6VÆb°¢6VÆb°¢F‚À¢f–ÆRÀ¢FF&6Uö–BÀ¢6öÆÆV7F–öç3¢†6„Ö£¦æWr‚’À¢6öÆÆV7F–öåöæÖW5ö'•ö–C¢†6„Ö£¦æWr‚’À¢&–Ö'•ö–Eö–æFWƒ¢†6„Ö£¦æWr‚’À¢æW‡E÷6WVVæ6S¢À¢æW‡Eö6öÆÆV7F–öåö–C¢À¢æW‡EöFö7VÖVçEö–C¢À¢Fö7VÖVçEö–G5öW††W7FVC¢fÇ6RÀ¢Fö7VÖVçEö6÷VçC¢À¢w&—FUöf–ÆVC¢fÇ6RÀ¢&V6÷fW'•÷&W÷'C¢&V6÷fW'•&W÷'C£¦FVfVÇB‚’À¢Ğ¢Ğ ¢òòò&WGW&ç2F†Ræ÷&ÖÆ—¦VBF‚W6VBFò÷VâF†RFF&6Rà¢V"fâF‚‚g6VÆb’ÓâeF‚°¢g6VÆbçF€¢Ğ ¢òòò&WGW&ç2F†RUT”B'—FW27F÷&VB–âF†RFF&6R†VFW"à¢V"6öç7BfâFF&6Uö–B‚g6VÆb’Óâ·Sƒ²eÒ°¢6VÆbæFF&6Uö–@¢Ğ ¢òòò&W÷'G2ç’–æ6ö×ÆWFRf–æÂ&V6÷&BF—66&FVBGW&–ær÷Vâà¢V"6öç7Bfâ&V6÷fW'•÷&W÷'B‚g6VÆb’Óâ&V6÷fW'•&W÷'B°¢6VÆbç&V6÷fW'•÷&W÷'@¢Ğ ¢òòòW'6—7G2æWr6öÆÆV7F–öâæB&WGW&ç2—G2FF&6RÖÆö6Â–FVçF–f–W"à¢V"fâ7&VFUö6öÆÆV7F–öâ‚f×WB6VÆbÂæÖS¢g7G"’Óâ&W7VÇCÄ6öÆÆV7F–öä–Câ°¢6VÆbæ6†V6µ÷W6&ÆR‚“ó°¢fÆ–FFUö6öÆÆV7F–öåöæÖR†æÖR“ó°¢–b6VÆbæ6öÆÆV7F–öç2æ6öçF–ç5ö¶W’†æÖR’°¢&WGW&âW'"„W'&÷#£¤GWÆ–6FR†f÷&ÖB€¢&6öÆÆV7F–öâ¶æÖS£÷ÒÇ&VG’W†—7G2 ¢’’“°¢Ğ¢–b6VÆbæ6öÆÆV7F–öç2æÆVâ‚’ãÒÔ…ô4ôÄÄT5D”ôå2°¢&WGW&âW'"„W'&÷#£¤Æ–Ö—B‚&6öÆÆV7F–öâ6÷VçB&V6†VBÃ"æ–çFò‚’’“°¢Ğ¢–b6VÆbææW‡Eö6öÆÆV7F–öåö–BÃÒ°¢&WGW&âW'"„W'&÷#£¤Æ–Ö—B€¢&6öÆÆV7F–öâ–FVçF–f–W"76R—2W††W7FVB"æ–çFò‚’À¢’“°¢Ğ ¢ÆWB6öÆÆV7F–öåö–BÒ6VÆbææW‡Eö6öÆÆV7F–öåö–C°¢ÆWB–ÆöBÒVæ6öFUö6öÆÆV7F–öåö7&VFR†6öÆÆV7F–öåö–BÂæÖR“ó°¢6VÆbæVæE÷&V6÷&B…&V6÷&EG—S£¤6öÆÆV7F–öä7&VFRÂg–ÆöB“ó°¢6VÆbæ6öÆÆV7F–öç2æ–ç6W'B€¢æÖRçFõö÷væVB‚’À¢6öÆÆV7F–öå7FFR°¢–C¢6öÆÆV7F–öåö–BÀ¢Fö7VÖVçG3¢%G&VTÖ£¦æWr‚’À¢ÒÀ¢“°¢6VÆbæ6öÆÆV7F–öåöæÖW5ö'•ö–@¢æ–ç6W'B†6öÆÆV7F–öåö–BÂæÖRçFõö÷væVB‚’“°¢6VÆbææW‡Eö6öÆÆV7F–öåö–BÒ6öÆÆV7F–öåö–Bæ6†V6¶VEöFBƒ’çVçw&ö÷"ƒ“°¢ö²„6öÆÆV7F–öä–B†6öÆÆV7F–öåö–B’¢Ğ ¢òòò–ç6W'G2Fö7VÖVçBæB76–vç2F†RæW‡B÷6—F—fRFF&6RÖÆö6Â”Bà¢V"fâ–ç6W'B‚f×WB6VÆbÂ6öÆÆV7F–öåöæÖS¢g7G"ÂFö7VÖVçC¢Fö7VÖVçB’Óâ&W7VÇCÄFö7VÖVçD–Câ°¢6VÆbæ6†V6µ÷W6&ÆR‚“ó°¢–b6VÆbæFö7VÖVçEö–G5öW††W7FVBÇÂ6VÆbææW‡EöFö7VÖVçEö–BÃÒ°¢&WGW&âW'"„W'&÷#£¤Æ–Ö—B€¢&Fö7VÖVçB–FVçF–f–W"76R—2W††W7FVB"æ–çFò‚’À¢’“°¢Ğ¢ÆWB–BÒFö7VÖVçD–B‡6VÆbææW‡EöFö7VÖVçEö–B“°¢6VÆbæ–ç6W'E÷v—F…ö–B†6öÆÆV7F–öåöæÖRÂ–BÂFö7VÖVçB“ó°¢ö²†–B¢Ğ ¢òòò–ç6W'G2Fö7VÖVçBVæFW"6ÆÆW"×7WÆ–VB÷6—F—fR–FVçF–f–W"à¢V"fâ–ç6W'E÷v—F…ö–B€¢f×WB6VÆbÀ¢6öÆÆV7F–öåöæÖS¢g7G"À¢–C¢Fö7VÖVçD–BÀ¢Fö7VÖVçC¢Fö7VÖVçBÀ¢’Óâ&W7VÇCÂ‚“â°¢6VÆbæ6†V6µ÷W6&ÆR‚“ó°¢ÆWB6öÆÆV7F–öåö–BÒ6VÆbæ6öÆÆV7F–öåö–B†6öÆÆV7F–öåöæÖR“ó°¢–b6VÆbç&–Ö'•ö–Eö–æFW‚æ6öçF–ç5ö¶W’‚f–BçfÇVR‚’’°¢&WGW&âW'"„W'&÷#£¤GWÆ–6FR†f÷&ÖB‚&Fö7VÖVçB”B·Ò"Â–BçfÇVR‚’’’“°¢Ğ¢–b6VÆbæFö7VÖVçEö6÷VçBãÒÔ…ôDô5TÔTåE2°¢&WGW&âW'"„W'&÷#£¤Æ–Ö—B‚&7F—fRFö7VÖVçB6÷VçB&V6†VBÃ"æ–çFò‚’’“°¢Ğ¢ÆWB–ÆöBÒVæ6öFUöFö7VÖVçEö×WFF–öâ†6öÆÆV7F–öåö–BÂ–BÂfFö7VÖVçB“ó°¢6VÆbæVæE÷&V6÷&B…&V6÷&EG—S£¤Fö7VÖVçD–ç6W'BÂg–ÆöB“ó°¢6VÆbæ6öÆÆV7F–öç0¢ævWEö×WB†6öÆÆV7F–öåöæÖR¢æW‡V7B‚&6öÆÆV7F–öâ6†V6¶VB&÷fR"¢æFö7VÖVçG0¢æ–ç6W'B†–BçfÇVR‚’ÂFö7VÖVçB“°¢6VÆbç&–Ö'•ö–Eö–æFW‚æ–ç6W'B†–BçfÇVR‚’Â6öÆÆV7F–öåö–B“°¢6VÆbæFö7VÖVçEö6÷VçB³Ò°¢6VÆbæGfæ6UöæW‡EöFö7VÖVçEö–B†–BçfÇVR‚’“°¢ö²‚‚’¢Ğ ¢òòò&VG2Fö7VÖVçB'’&–Ö'’”Bg&öÒF†RæÖVB6öÆÆV7F–öâà¢V"fâvWB‚g6VÆbÂ6öÆÆV7F–öåöæÖS¢g7G"Â–C¢Fö7VÖVçD–B’Óâ&W7VÇCÄ÷F–öãÂdFö7VÖVçCãâ°¢6VÆbæ6†V6µ÷W6&ÆR‚“ó°¢ÆWB6öÆÆV7F–öåö–BÒ6VÆbæ6öÆÆV7F–öåö–B†6öÆÆV7F–öåöæÖR“ó°¢–b6VÆbç&–Ö'•ö–Eö–æFW‚ævWB‚f–BçfÇVR‚’’Ò6öÖR‚f6öÆÆV7F–öåö–B’°¢&WGW&âö²„æöæR“°¢Ğ¢ö²‡6VÆ`¢æ6öÆÆV7F–öç0¢ævWB†6öÆÆV7F–öåöæÖR¢ææE÷F†Vâ‡Ç7FFWÂ7FFRæFö7VÖVçG2ævWB‚f–BçfÇVR‚’’’¢Ğ ¢òòò&WÆ6W2âW†—7F–ærFö7VÖVçB2öæRÆövvVB÷W&F–öâà¢V"fâWFFR€¢f×WB6VÆbÀ¢6öÆÆV7F–öåöæÖS¢g7G"À¢–C¢Fö7VÖVçD–BÀ¢Fö7VÖVçC¢Fö7VÖVçBÀ¢’Óâ&W7VÇCÆ&ööÃâ°¢6VÆbæ6†V6µ÷W6&ÆR‚“ó°¢ÆWB6öÆÆV7F–öåö–BÒ6VÆbæ6öÆÆV7F–öåö–B†6öÆÆV7F–öåöæÖR“ó°¢–b6VÆbç&–Ö'•ö–Eö–æFW‚ævWB‚f–BçfÇVR‚’’Ò6öÖR‚f6öÆÆV7F–öåö–B’°¢&WGW&âö²†fÇ6R“°¢Ğ¢ÆWB–ÆöBÒVæ6öFUöFö7VÖVçEö×WFF–öâ†6öÆÆV7F–öåö–BÂ–BÂfFö7VÖVçB“ó°¢6VÆbæVæE÷&V6÷&B…&V6÷&EG—S£¤Fö7VÖVçEWFFRÂg–ÆöB“ó°¢6VÆbæ6öÆÆV7F–öç0¢ævWEö×WB†6öÆÆV7F–öåöæÖR¢æW‡V7B‚&6öÆÆV7F–öâ6†V6¶VB&÷fR"¢æFö7VÖVçG0¢æ–ç6W'B†–BçfÇVR‚’ÂFö7VÖVçB“°¢ö²‡G'VR¢Ğ ¢òòòFVÆWFW2âW†—7F–ærFö7VÖVçB2öæRÆövvVB÷W&F–öâà¢V"fâFVÆWFR‚f×WB6VÆbÂ6öÆÆV7F–öåöæÖS¢g7G"Â–C¢Fö7VÖVçD–B’Óâ&W7VÇCÆ&ööÃâ°¢6VÆbæ6†V6µ÷W6&ÆR‚“ó°¢ÆWB6öÆÆV7F–öåö–BÒ6VÆbæ6öÆÆV7F–öåö–B†6öÆÆV7F–öåöæÖR“ó°¢–b6VÆbç&–Ö'•ö–Eö–æFW‚ævWB‚f–BçfÇVR‚’’Ò6öÖR‚f6öÆÆV7F–öåö–B’°¢&WGW&âö²†fÇ6R“°¢Ğ¢ÆWB×WB–ÆöBÒfV3£§v—F…ö66—G’ƒb“°¢–ÆöBæW‡FVæEög&öÕ÷6Æ–6R‚f6öÆÆV7F–öåö–BçFõö&Uö'—FW2‚’“°¢–ÆöBæW‡FVæEög&öÕ÷6Æ–6R‚f–BçfÇVR‚’çFõö&Uö'—FW2‚’“°¢6VÆbæVæE÷&V6÷&B…&V6÷&EG—S£¤Fö7VÖVçDFVÆWFRÂg–ÆöB“ó°¢6VÆbæ6öÆÆV7F–öç0¢ævWEö×WB†6öÆÆV7F–öåöæÖR¢æW‡V7B‚&6öÆÆV7F–öâ6†V6¶VB&÷fR"¢æFö7VÖVçG0¢ç&VÖ÷fR‚f–BçfÇVR‚’“°¢6VÆbç&–Ö'•ö–Eö–æFW‚ç&VÖ÷fR‚f–BçfÇVR‚’“°¢6VÆbæFö7VÖVçEö6÷VçBÓÒ°¢ö²‡G'VR¢Ğ ¢òòò&WGW&ç27F—fR”G2–â66VæF–ær÷&FW"à¢V"fâFö7VÖVçEö–G2‚g6VÆbÂ6öÆÆV7F–öåöæÖS¢g7G"’Óâ&W7VÇCÅfV3ÄFö7VÖVçD–Cãâ°¢6VÆbæ6†V6µ÷W6&ÆR‚“ó°¢ÆWB6öÆÆV7F–öâÒ6VÆbæ6öÆÆV7F–öâ†6öÆÆV7F–öåöæÖR“ó°¢ö²†6öÆÆV7F–öà¢æFö7VÖVçG0¢æ¶W—2‚¢æ6÷–VB‚¢æÖ„Fö7VÖVçD–B¢æ6öÆÆV7B‚’¢Ğ ¢òòò&WGW&ç26öÆÆV7F–öâæÖW2–â66VæF–ær÷&FW"à¢V"fâ6öÆÆV7F–öåöæÖW2‚g6VÆb’Óâ&W7VÇCÅfV3Å7G&–æsãâ°¢6VÆbæ6†V6µ÷W6&ÆR‚“ó°¢ÆWB×WBæÖW3¢fV3ÅóâÒ6VÆbæ6öÆÆV7F–öç2æ¶W—2‚’æ6ÆöæVB‚’æ6öÆÆV7B‚“°¢æÖW2ç6÷'B‚“°¢ö²†æÖW2¢Ğ ¢òòòw&—FW26ö×7FVBÂ'—FRÖ6ö×F–&ÆR6÷’v—F†÷WB&WÆ6–ærF†—2FF&6Rà¢òòğ¢òòòF†RæWrf–ÆR&W6W'fW26öÆÆV7F–öâöFö7VÖVçB”G2æBF†RFF&6RUT”BÂ'W@¢òòò&Ww&—FW2öæÇ’7W'&VçFÇ’7F—fRFö7VÖVçG2â—B—2V&Æ—6†VBv—F†÷W@¢òòò÷fW'w&—F–ærâW†—7F–ærFW7F–æF–öââF†RFW7F–æF–öâf–ÆW7—7FVÒ×W7@¢òòò7W÷'B†&BÆ–æ·3²÷F†W'v—6RF†—2&WGW&ç2â’ôòW'&÷"æBÆVfW2F†—0¢òòòFF&6RVæ6†ævVBà¢V"fâw&—FUö6ö×7FVEö6÷’‚g6VÆbÂF&vWC¢–×Â5&VcÅFƒâ’Óâ&W7VÇCÂ‚“â°¢6VÆbæ6†V6µ÷W6&ÆR‚“ó°¢ÆWBF&vWBÒ'6öÇWFU÷F‚‡F&vWBæ5÷&Vb‚’“ó°¢–bF&vWBÓÒ6VÆbçF‚°¢&WGW&âW'"„W'&÷#£¤–çfÆ–D–çWB€¢&6ö×7FVB6÷’×W7BW6RF–ffW&VçBF‚"æ–çFò‚’À¢’“°¢Ğ¢–bF&vWBæW†—7G2‚’°¢&WGW&âW'"„W'&÷#£¤GWÆ–6FR†f÷&ÖB€¢&6ö×7FVBÖ6÷’FW7F–æF–öâÇ&VG’W†—7G3¢·Ò"À¢F&vWBæF—7Æ’‚¢’’“°¢Ğ¢ÆWBFV×÷&'’ÒFV×÷&'•÷6–&Æ–æu÷F‚‚gF&vWB“ó°¢ÆWB×WBf–ÆRÒ÷Vä÷F–öç3£¦æWr‚¢çw&—FR‡G'VR¢æ7&VFUöæWr‡G'VR¢æ÷Vâ‚gFV×÷&'’“ó° ¢ÆWBw&—FU÷&W7VÇBÒ‡ÇÂÓâ&W7VÇCÂ‚“â°¢f–ÆRçw&—FUöÆÂ‚ff÷&ÖC£¦Væ6öFUö†VFW"‡6VÆbæFF&6Uö–B’“ó°¢ÆWB×WBf–ÆU÷6—¦RÒ„TDU%õ4•¤R2ScC°¢ÆWB×WB6WVVæ6RÒö“cC°¢ÆWB×WB6öÆÆV7F–öç3¢fV3ÅóâÒ6VÆ`¢æ6öÆÆV7F–öåöæÖW5ö'•ö–@¢æ—FW"‚¢æÖ‡Â†–BÂæÖR—Â‚¦–BÂæÖRæ5÷7G"‚’’¢æ6öÆÆV7B‚“°¢6öÆÆV7F–öç2ç6÷'E÷Vç7F&ÆUö'•ö¶W’‡Â†–BÂò—Â¦–B“°¢–b6öÆÆV7F–öç2æÆVâ‚’âÔ…ô4ôÄÄT5D”ôå2°¢&WGW&âW'"„W'&÷#£¤–çFVw&—G’€¢&–âÖÖVÖ÷'’6öÆÆV7F–öâ6÷VçBW†6VVG2F†Rf–ÆRÆ–Ö—B"æ–çFò‚’À¢’“°¢Ğ ¢ÆWB×WBW‡V7FVEö6öÆÆV7F–öåö–BÒö“cC°¢f÷"†6öÆÆV7F–öåö–BÂæÖR’–â6öÆÆV7F–öç2°¢–b6öÆÆV7F–öåö–BÒW‡V7FVEö6öÆÆV7F–öåö–B°¢&WGW&âW'"„W'&÷#£¤–çFVw&—G’€¢&6öÆÆV7F–öâ”G2&Ræ÷B6öçF–wV÷W2GW&–ær6ö×7F–öâ"æ–çFò‚’À¢’“°¢Ğ¢W‡V7FVEö6öÆÆV7F–öåö–BÒW‡V7FVEö6öÆÆV7F–öåö–@¢æ6†V6¶VEöFBƒ¢æöµö÷%öVÇ6R‡ÇÂW'&÷#£¤Æ–Ö—B‚&6öÆÆV7F–öâ–FVçF–f–W"÷fW&fÆ÷r"æ–çFò‚’’“ó°¢ÆWB6öÆÆV7F–öâÒ6VÆbæ6öÆÆV7F–öç2ævWB†æÖR’æöµö÷%öVÇ6R‡ÇÂ°¢W'&÷#£¤–çFVw&—G’‚&6öÆÆV7F–öâ”BÖ—2–æ6öç6—7FVçBGW&–ær6ö×7F–öâ"æ–çFò‚’¢Ò“ó°¢–b6öÆÆV7F–öâæ–BÒ6öÆÆV7F–öåö–B°¢&WGW&âW'"„W'&÷#£¤–çFVw&—G’€¢&6öÆÆV7F–öâ”BÖ—2–æ6öç6—7FVçBGW&–ær6ö×7F–öâ"æ–çFò‚’À¢’“°¢Ğ¢w&—FU÷6æ6†÷E÷&V6÷&B€¢f×WBf–ÆRÀ¢f×WB6WVVæ6RÀ¢f×WBf–ÆU÷6—¦RÀ¢&V6÷&EG—S£¤6öÆÆV7F–öä7&VFRÀ¢fVæ6öFUö6öÆÆV7F–öåö7&VFR†6öÆÆV7F–öåö–BÂæÖR“òÀ¢“ó°¢f÷"†Fö7VÖVçEö–BÂFö7VÖVçB’–âf6öÆÆV7F–öâæFö7VÖVçG2°¢w&—FU÷6æ6†÷Eı¼Û»h‘éì¶»§q«^uXÚÙYŠBˆ™Øİ[Y[Âˆš[œÙ\
-Øİ[Y[ÚYØİ[Y[
-NÂˆBˆBˆ™XÛÜ™\N‘Øİ[Y[[]HOˆÂˆ]ÛÛXİ[Û—ÚYH[œ]šM
-™[]HÛÛXİ[ÛˆY[YšY\ˆŠOÎÂˆ]Øİ[Y[ÚYH[œ]šM
-™[]HØİ[Y[Y[YšY\ˆŠOÎÂˆ[œ]™š[š\Ú
-™[]H™XÛÜ™ŠOÎÂˆYˆØİ[Y[ÚYHˆÙ[‹œš[X\WÚYÚ[™^™Ù]
-	™Øİ[Y[ÚY
-HOHÛÛYJ	˜ÛÛXİ[Û—ÚY
-BˆÂˆ™]\›ˆ\œŠ\œ›Ü’[YÜš]Jˆ™[]H™XÛÜ™˜[Y\È[ˆ[šÛ›İÛˆØİ[Y[‹š[Ê
-Kˆ
-JNÂˆBˆ]˜[YHHÙ[‚ˆ˜ÛÛXİ[Û—Û˜[Y\×ØWÚYˆ™Ù]
-	˜ÛÛXİ[Û—ÚY
-Bˆ›Ú×ÛÜ—Ù[ÙJÂˆ\œ›Ü’[YÜš]J™[]H™XÛÜ™˜[Y\È[ˆ[šÛ›İÛˆÛÛXİ[Ûˆ‹š[Ê
-JBˆJOÂˆ˜ÛÛ™J
-NÂˆÙ[‹˜ÛÛXİ[ÛœÂˆ™Ù]Û]]
-	›˜[YJBˆ™^Xİ
-˜ÛÛXİ[ÛˆX\ÚXÚÙYŠBˆ™Øİ[Y[Âˆœ™[[İ™J	™Øİ[Y[ÚY
-NÂˆÙ[‹œš[X\WÚYÚ[™^œ™[[İ™J	™Øİ[Y[ÚY
-NÂˆÙ[‹™Øİ[Y[ØÛİ[OHNÂˆBˆBˆÚÊ
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs::{self, File, OpenOptions, TryLockError},
+    io::{Read, Seek, SeekFrom, Write},
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
+};
 
-JBˆB‚ˆ›ˆ™XÛİ™\—Ú[˜ÛÛ\]WİZ[
-	›]]Ù[‹\İÙÛÛÙÛÙ™œÙ]ˆMÜšYÚ[˜[ÜÚ^™NˆM
-HOˆ™\İ[
+use crate::{
+    CollectionId, Document, DocumentId, Error, Result,
+    codec::{self, Cursor},
+    format::{
+        self, HEADER_SIZE, MAX_RECORD_SIZE, MIN_RECORD_SIZE, RECORD_MAGIC, RECORD_PREFIX_SIZE,
+    },
+};
 
-OˆÂˆÙ[‹™š[KœÙ]Û[Š\İÙÛÛÙÛÙ™œÙ]
-OÎÂˆÙ[‹™š[KœŞ[˜×Ø[
+/// Maximum supported file size for version 1.
+pub const MAX_DATABASE_BYTES: u64 = format::MAX_DATABASE_SIZE_BYTES;
+/// Maximum active collections in one database.
+pub const MAX_COLLECTIONS: usize = 10_000;
+/// Maximum active documents in one database.
+pub const MAX_DOCUMENTS: usize = 100_000;
 
-OÎÂˆÙ[‹œ™XÛİ™\WÜ™\ÜH™XÛİ™\T™\ÜÂˆ\ØØ\™YØ]\ÎˆÜšYÚ[˜[ÜÚ^™HH\İÙÛÛÙÛÙ™œÙ]ˆNÂˆÚÊ
+const COLLECTION_NAME_MAX_BYTES: usize = 255;
+static NEXT_COMPACTION_TEMP_ID: AtomicU64 = AtomicU64::new(1);
 
-JBˆB‚ˆ›ˆ\[™Ü™XÛÜ™
-	›]]Ù[‹™XÛÜ™İ\Nˆ™XÛÜ™\K^[ØYˆ	–İNJHOˆ™\İ[
+/// Number of bytes discarded from an incomplete final record while opening.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RecoveryReport {
+    discarded_bytes: u64,
+}
 
-OˆÂˆYˆÙ[‹›™^ÜÙ\]Y[˜ÙHHÙ[‹›™^ÜÙ\]Y[˜ÙHOHM“PVÂˆ™]\›ˆ\œŠ\œ›Ü“[Z]
-œ™XÛÜ™Ù\]Y[˜ÙHÜXÙH\È^]\İY‹š[Ê
-JJNÂˆBˆ]İ[Û[™İHRS—Ô‘PÓÔ‘ÔÒV‘Bˆ˜ÚXÚÙYØY
-^[ØY›[Š
-JBˆ›Ú×ÛÜ—Ù[ÙJ\œ›Ü“[Z]
-œ™XÛÜ™[™İİ™\™›İÈ‹š[Ê
-JJOÎÂˆYˆİ[Û[™İˆPVÔ‘PÓÔ‘ÔÒV‘HÂˆ™]\›ˆ\œŠ\œ›Ü“[Z]
-ˆœ™XÛÜ™^ÙYYÈHMÈZPˆX^[][H›ØÚÈÚ^™H‹š[Ê
-Kˆ
-JNÂˆBˆ]İ\œ™[ÜÚ^™HHÙ[‹™š[K›Y]Y]J
-OË›[Š
-NÂˆYˆİ\œ™[ÜÚ^™Bˆ˜ÚXÚÙYØY
-İ[Û[™İ\ÈM
-Bˆš\×Û›Û™WÛÜŠÚ^™_Ú^™HˆPVÑUPTÑWĞ–UTÊBˆÂˆ™]\›ˆ\œŠ\œ›Ü“[Z]
-ˆ™]X˜\ÙHš[HÚ^™H[Z]™XXÚYÈÜš]HHÛÛ\XİYÛÜH[™İÚ]Úš[\ÈX[X[H‹š[Ê
-Kˆ
-JNÂˆBˆ]›ØÚÈH[˜ÛÙWÜ™XÛÜ™
-™XÛÜ™İ\KÙ[‹›™^ÜÙ\]Y[˜ÙK^[ØY
-OÎÂˆÙ[‹™š[KœÙYZÊÙYZÑœ›ÛN‘[™
-
-JOÎÂˆ]Üš]WÜ™\İ[H
-Oˆİš[Î”™\İ[
+impl RecoveryReport {
+    /// Returns the number of bytes removed from an incomplete final record.
+    pub const fn discarded_bytes(self) -> u64 {
+        self.discarded_bytes
+    }
+}
 
-OˆÂˆÜ˜\ÚØ™Y›Ü™WİÜš]J
-NÂˆYˆÜ˜\ÚÙ\š[™×İÜš]J
-HÂˆÙ[‹™š[KÜš]WØ[
-	˜›ØÚÖË‹Š›ØÚË›[Š
-HÈŠK›X^
-JWJOÎÂˆÜ˜\ÚÜ]\ÙJ™\š[™×İÜš]HŠNÂˆBˆÙ[‹™š[KÜš]WØ[
-	˜›ØÚÊOÎÂˆÜ˜\ÚØY\—İÜš]J
-NÂˆÙ[‹™š[KœŞ[˜×Ø[
+struct CollectionState {
+    id: i64,
+    documents: BTreeMap<i64, Document>,
+}
 
-OÎÂˆÜ˜\ÚØY\—ÜŞ[˜Ê
-NÂˆÚÊ
+/// Embedded database handle backed by SeaWorld's version 1 append-only file.
+///
+/// A handle owns an exclusive OS file lock. A write is durable only after its
+/// complete checksummed record has been synchronized successfully.
+pub struct Database {
+    path: PathBuf,
+    file: File,
+    database_id: [u8; 16],
+    collections: HashMap<String, CollectionState>,
+    collection_names_by_id: HashMap<i64, String>,
+    primary_id_index: HashMap<i64, i64>,
+    next_sequence: i64,
+    next_collection_id: i64,
+    next_document_id: i64,
+    document_ids_exhausted: bool,
+    document_count: usize,
+    write_failed: bool,
+    recovery_report: RecoveryReport,
+}
 
-JBˆJJ
-NÂˆYˆ]\œŠ\œ›ÜŠHHÜš]WÜ™\İ[ÂˆÙ[‹Üš]WÙ˜Z[YHYNÂˆ™]\›ˆ\œŠ\œ›Ü’[Ê\œ›ÜŠJNÂˆBˆÙ[‹›™^ÜÙ\]Y[˜ÙH
-ÏHNÂˆÚÊ
+impl Database {
+    /// Creates a new database file and never overwrites an existing path.
+    pub fn create(path: impl AsRef<Path>) -> Result<Self> {
+        let path = absolute_path(path.as_ref())?;
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(&path)?;
+        acquire_lock(&file)?;
 
-JBˆB‚ˆ›ˆÛÛXİ[Û—ÚY
-	œÙ[‹˜[YNˆ	œİŠHOˆ™\İ[MˆÂˆ˜[Y]WØÛÛXİ[Û—Û˜[YJ˜[YJOÎÂˆÙ[‹˜ÛÛXİ[ÛœÂˆ™Ù]
-˜[YJBˆ›X\
-İ]_İ]KšY
-Bˆ›Ú×ÛÜ—Ù[ÙJ\œ›Ü“›İ›İ[™
-›Ü›X]J˜ÛÛXİ[ÛˆÛ˜[YNßHŠJJBˆB‚ˆ›ˆÛÛXİ[ÛŠ	œÙ[‹˜[YNˆ	œİŠHOˆ™\İ[	ÛÛXİ[Û”İ]OˆÂˆ˜[Y]WØÛÛXİ[Û—Û˜[YJ˜[YJOÎÂˆÙ[‹˜ÛÛXİ[ÛœÂˆ™Ù]
-˜[YJBˆ›Ú×ÛÜ—Ù[ÙJ\œ›Ü“›İ›İ[™
-›Ü›X]J˜ÛÛXİ[ÛˆÛ˜[YNßHŠJJBˆB‚ˆ›ˆY˜[˜ÙWÛ™^ÙØİ[Y[ÚY
-	›]]Ù[‹\ÙYÚYˆM
-HÂˆYˆ\ÙYÚYHÙ[‹›™^ÙØİ[Y[ÚYÂˆYˆ\ÙYÚYOHM“PVÂˆÙ[‹™Øİ[Y[ÚY×Ù^]\İYHYNÂˆH[ÙHÂˆÙ[‹›™^ÙØİ[Y[ÚYH\ÙYÚY
-ÈNÂˆBˆBˆB‚ˆ›ˆÚXÚ×İ\ØX›J	œÙ[ŠHOˆ™\İ[
+        let database_id = random_database_id()?;
+        let header = format::encode_header(database_id);
+        file.write_all(&header)?;
+        file.sync_all()?;
+        sync_parent_directory(&path)?;
 
-OˆÂˆYˆÙ[‹Üš]WÙ˜Z[YÂˆ™]\›ˆ\œŠ\œ›Ü’[Êİš[Î‘\œ›Ü›İ\Šˆ˜Hš[Üˆ\[™˜Z[YÈÛÜÙH[™™[Ü[ˆH]X˜\ÙH‹ˆ
-JJNÂˆBˆÚÊ
+        Ok(Self::new(path, file, database_id))
+    }
 
-JBˆBŸB‚ˆÖÙ\š]™JÛÛ™KÛÜK\X[\K\JWB™[[H™XÛÜ™\HÂˆÛÛXİ[ÛÜ™X]KˆØİ[Y[[œÙ\ˆØİ[Y[\]KˆØİ[Y[[]KŸB‚š[\™XÛÜ™\HÂˆÛÛœİ›ˆÛÙJÙ[ŠHOˆNÂˆX]ÚÙ[ˆÂˆÙ[ÛÛXİ[ÛÜ™X]HOˆKˆÙ[‘Øİ[Y[[œÙ\Oˆ‹ˆÙ[‘Øİ[Y[\]HOˆËˆÙ[‘Øİ[Y[[]HOˆˆBˆB‚ˆ›ˆœ›ÛWØÛÙJÛÙNˆN
-HOˆ™\İ[Ù[ˆÂˆX]ÚÛÙHÂˆHOˆÚÊÙ[ÛÛXİ[ÛÜ™X]JKˆˆOˆÚÊÙ[‘Øİ[Y[[œÙ\
-KˆÈOˆÚÊÙ[‘Øİ[Y[\]JKˆOˆÚÊÙ[‘Øİ[Y[[]JKˆÈOˆ\œŠ\œ›Ü‘›Ü›X]
-›Ü›X]J[šÛ›İÛˆ™XÛÜ™\HØÛÙ_HŠJJKˆBˆBŸB‚™›ˆ[˜ÛÙWÜ™XÛÜ™
-™XÛÜ™İ\Nˆ™XÛÜ™\KÙ\]Y[˜ÙNˆM^[ØYˆ	–İNJHOˆ™\İ[™XÏNˆÂˆ]İ[Û[™İHRS—Ô‘PÓÔ‘ÔÒV‘Bˆ˜ÚXÚÙYØY
-^[ØY›[Š
-JBˆ›Ú×ÛÜ—Ù[ÙJ\œ›Ü“[Z]
-œ™XÛÜ™[™İİ™\™›İÈ‹š[Ê
-JJOÎÂˆYˆİ[Û[™İˆPVÔ‘PÓÔ‘ÔÒV‘HÂˆ™]\›ˆ\œŠ\œ›Ü“[Z]
-œ™XÛÜ™^ÙYYÈHX^[][H›ØÚÈÚ^™H‹š[Ê
-JJNÂˆBˆ]]]›ØÚÈH™XÎÚ]ØØ\XÚ]Jİ[Û[™İ
-NÂˆ›ØÚË™^[™Ùœ›ÛWÜÛXÙJ‘PÓÔ‘ÓPQÒPÊNÂˆ›ØÚËœ\Ú
-™XÛÜ™İ\K˜ÛÙJ
-JNÂˆ›ØÚËœ\Ú
-
-NÂˆ›ØÚË™^[™Ùœ›ÛWÜÛXÙJ	ŒİLM‹×Ø™WØ]\Ê
-JNÂˆ›ØÚË™^[™Ùœ›ÛWÜÛXÙJ	Šİ[Û[™İ\ÈLÌŠK×Ø™WØ]\Ê
-JNÂˆ›ØÚË™^[™Ùœ›ÛWÜÛXÙJ	œÙ\]Y[˜ÙK×Ø™WØ]\Ê
-JNÂˆ›ØÚË™^[™Ùœ›ÛWÜÛXÙJ^[ØY
-NÂˆ]ÚXÚÜİ[HH›Ü›X]˜Ü˜ÌÌ˜Ê	˜›ØÚÊNÂˆ›ØÚË™^[™Ùœ›ÛWÜÛXÙJ	˜ÚXÚÜİ[K×Ø™WØ]\Ê
-JNÂˆÚÊ›ØÚÊBŸB‚™›ˆÜš]WÜÛ˜\ÚİÜ™XÛÜ™
-ˆš[Nˆ	›]]š[KˆÙ\]Y[˜ÙNˆ	›]]Mˆš[WÜÚ^™Nˆ	›]]Mˆ™XÛÜ™İ\Nˆ™XÛÜ™\Kˆ^[ØYˆ	–İNKŠHOˆ™\İ[
+    /// Opens a database, validates the file, and replays complete records.
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        let path = absolute_path(path.as_ref())?;
+        let mut file = OpenOptions::new().read(true).write(true).open(&path)?;
+        acquire_lock(&file)?;
+        let file_size = file.metadata()?.len();
+        if file_size > MAX_DATABASE_BYTES {
+            return Err(Error::Format(
+                "database file exceeds the 128 MiB limit".into(),
+            ));
+        }
+        if file_size < HEADER_SIZE as u64 {
+            return Err(Error::Format(
+                "database file is shorter than its header".into(),
+            ));
+        }
 
-OˆÂˆYˆ
-œÙ\]Y[˜ÙHH
-œÙ\]Y[˜ÙHOHM“PVÂˆ™]\›ˆ\œŠ\œ›Ü“[Z]
-œ™XÛÜ™Ù\]Y[˜ÙHÜXÙH\È^]\İY‹š[Ê
-JJNÂˆBˆ]›ØÚÈH[˜ÛÙWÜ™XÛÜ™
-™XÛÜ™İ\K
-œÙ\]Y[˜ÙK^[ØY
-OÎÂˆ]\]YÜÚ^™HHš[WÜÚ^™Bˆ˜ÚXÚÙYØY
-›ØÚË›[Š
-H\ÈM
-Bˆ›Ú×ÛÜ—Ù[ÙJ\œ›Ü“[Z]
-™]X˜\ÙHš[H[™İİ™\™›İÈ‹š[Ê
-JJOÎÂˆYˆ\]YÜÚ^™HˆPVÑUPTÑWĞ–UTÈÂˆ™]\›ˆ\œŠ\œ›Ü“[Z]
-ˆ˜ÛÛ\XİY]X˜\ÙH^ÙYYÈHLZPˆš[H[Z]‹š[Ê
-Kˆ
-JNÂˆBˆš[KÜš]WØ[
-	˜›ØÚÊOÎÂˆ
-™š[WÜÚ^™HH\]YÜÚ^™NÂˆ
-œÙ\]Y[˜ÙH
-ÏHNÂˆÚÊ
+        let mut header = [0_u8; HEADER_SIZE];
+        file.read_exact(&mut header)?;
+        let database_id = format::decode_header(&header)?;
+        let mut database = Self::new(path, file, database_id);
+        database.replay_records(file_size)?;
+        Ok(database)
+    }
 
-JBŸB‚™›ˆ[˜ÛÙWØÛÛXİ[Û—ØÜ™X]JÛÛXİ[Û—ÚYˆM˜[YNˆ	œİŠHOˆ™\İ[™XÏNˆÂˆ]˜[YWØ]\ÈH˜[YK˜\×Ø]\Ê
-NÂˆYˆ˜[YWØ]\Ë›[Š
-HˆÓÓPÕSÓ—ÓSQWÓPVĞ–UTÈÂˆ™]\›ˆ\œŠ\œ›Ü“[Z]
-˜ÛÛXİ[Ûˆ˜[YH\ÈÛÈÛ™È‹š[Ê
-JJNÂˆBˆ][™İHLÌWÙœ›ÛJ˜[YWØ]\Ë›[Š
-JBˆ›X\Ù\œŠß\œ›Ü“[Z]
-˜ÛÛXİ[Ûˆ˜[YH\ÈÛÈÛ™È‹š[Ê
-JJOÎÂˆ]]]^[ØYH™XÎÚ]ØØ\XÚ]JLˆ
-È˜[YWØ]\Ë›[Š
-JNÂˆ^[ØY™^[™Ùœ›ÛWÜÛXÙJ	˜ÛÛXİ[Û—ÚY×Ø™WØ]\Ê
-JNÂˆ^[ØY™^[™Ùœ›ÛWÜÛXÙJ	›[™İ×Ø™WØ]\Ê
-JNÂˆ^[ØY™^[™Ùœ›ÛWÜÛXÙJ˜[YWØ]\ÊNÂˆÚÊ^[ØY
-BŸB‚™›ˆ[˜ÛÙWÙØİ[Y[Û]]][ÛŠˆÛÛXİ[Û—ÚYˆMˆØİ[Y[ÚYˆØİ[Y[YˆØİ[Y[ˆ	‘Øİ[Y[ŠHOˆ™\İ[™XÏNˆÂˆ][˜ÛÙYÙØİ[Y[HÛÙXÎ™[˜ÛÙWÙØİ[Y[
-Øİ[Y[
-OÎÂˆ]Øİ[Y[Û[™İHLÌWÙœ›ÛJ[˜ÛÙYÙØİ[Y[›[Š
-JBˆ›X\Ù\œŠß\œ›Ü“[Z]
-™Øİ[Y[\ÈÛÈ\™ÙH‹š[Ê
-JJOÎÂˆ]]]^[ØYH™XÎÚ]ØØ\XÚ]JŒ
-È[˜ÛÙYÙØİ[Y[›[Š
-JNÂˆ^[ØY™^[™Ùœ›ÛWÜÛXÙJ	˜ÛÛXİ[Û—ÚY×Ø™WØ]\Ê
-JNÂˆ^[ØY™^[™Ùœ›ÛWÜÛXÙJ	™Øİ[Y[ÚY˜[YJ
-K×Ø™WØ]\Ê
-JNÂˆ^[ØY™^[™Ùœ›ÛWÜÛXÙJ	™Øİ[Y[Û[™İ×Ø™WØ]\Ê
-JNÂˆ^[ØY™^[™Ùœ›ÛWÜÛXÙJ	™[˜ÛÙYÙØİ[Y[
-NÂˆÚÊ^[ØY
-BŸB‚™›ˆXÛÙWÙØİ[Y[Û]]][ÛŠ[œ]ˆ	›]]İ\œÛÜ	×ÏŠHOˆ™\İ[
-MMØİ[Y[
-OˆÂˆ]ÛÛXİ[Û—ÚYH[œ]šM
-™Øİ[Y[ÛÛXİ[ÛˆY[YšY\ˆŠOÎÂˆ]Øİ[Y[ÚYH[œ]šM
-™Øİ[Y[Y[YšY\ˆŠOÎÂˆYˆÛÛXİ[Û—ÚYHØİ[Y[ÚYHÂˆ™]\›ˆ\œŠ\œ›Ü’[YÜš]Jˆ™Øİ[Y[Y[YšY\œÈ]\İ™HÜÚ]]™H‹š[Ê
-Kˆ
-JNÂˆBˆ]Øİ[Y[Û[™İH[œ]šLÌŠ™Øİ[Y[[™İŠOÎÂˆYˆØİ[Y[Û[™İØİ[Y[Û[™İ\È\Ú^™HˆÜ˜]N“PVÑĞÕSQS•Ğ–UTÈÂˆ™]\›ˆ\œŠ\œ›Ü’[YÜš]J™Øİ[Y[[™İ\Èİ]Ùˆ›İ[™È‹š[Ê
-JJNÂˆBˆ]Øİ[Y[Ø]\ÈH[œ]˜]\×Ù^Xİ
-Øİ[Y[Û[™İ\È\Ú^™K™Øİ[Y[^[ØYŠOÎÂˆ[œ]™š[š\Ú
-™Øİ[Y[™XÛÜ™ŠOÎÂˆ]Øİ[Y[HÛÙXÎ™XÛÙWÙØİ[Y[
-	™Øİ[Y[Ø]\ÊOÎÂˆÚÊ
-ÛÛXİ[Û—ÚYØİ[Y[ÚYØİ[Y[
-JBŸB‚™›ˆ˜[Y]WØÛÛXİ[Û—Û˜[YJ˜[YNˆ	œİŠHOˆ™\İ[
+    fn new(path: PathBuf, file: File, database_id: [u8; 16]) -> Self {
+        Self {
+            path,
+            file,
+            database_id,
+            collections: HashMap::new(),
+            collection_names_by_id: HashMap::new(),
+            primary_id_index: HashMap::new(),
+            next_sequence: 1,
+            next_collection_id: 1,
+            next_document_id: 1,
+            document_ids_exhausted: false,
+            document_count: 0,
+            write_failed: false,
+            recovery_report: RecoveryReport::default(),
+        }
+    }
 
-OˆÂˆ]]\ÈH˜[YK˜\×Ø]\Ê
-NÂˆYˆ]\Ëš\×Ù[\J
-H]\Ë›[Š
-HˆŒÈX]\ÖÌKš\×Ø\ØÚZWØ[X™]XÊ
-H	‰ˆ]\ÖÌHOH‰×ÉÈÂˆ™]\›ˆ\œŠ\œ›Ü’[˜[Y[œ]
-ˆ˜ÛÛXİ[Ûˆ˜[YH]\İİ\Ú][ˆTĞÒRH]\ˆÜˆ[™\œØÛÜ™H[™ÛÛZ[ˆ][ÜİŒÈÚ\˜Xİ\œÈ‹š[Ê
-Kˆ
-JNÂˆBˆYˆX]\Âˆš]\Š
-Bˆ˜[
-]_]Kš\×Ø\ØÚZWØ[[[Y\šXÊ
-H
-˜]HOH‰×ÉÈ
-˜]HOH‰ËIÊBˆÂˆ™]\›ˆ\œŠ\œ›Ü’[˜[Y[œ]
-ˆ˜ÛÛXİ[Ûˆ˜[Y\ÈXØÙ\Û›HTĞÒRH]\œËYÚ]Ë	×ÉÈ[™	ËIÈ‹š[Ê
-Kˆ
-JNÂˆBˆÚÊ
+    /// Returns the normalized path used to open the database.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
 
-JBŸB‚™›ˆXœÛÛ]WÜ]
-]ˆ	”]
-HOˆ™\İ[]YˆÂˆYˆ]˜\×ÛÜ×ÜİŠ
-Kš\×Ù[\J
-HÂˆ™]\›ˆ\œŠ\œ›Ü’[˜[Y[œ]
-™]X˜\ÙH]Ø[››İ™H[\H‹š[Ê
-JJNÂˆBˆÚÊYˆ]š\×ØXœÛÛ]J
-HÂˆ]×Ü]ØYŠ
-BˆH[ÙHÂˆİ™[˜İ\œ™[Ù\Š
-OËš›Ú[Š]
-BˆJBŸB‚™›ˆ[\Ü˜\WÜÚX›[™×Ü]
-\™Ù]ˆ	”]
-HOˆ™\İ[]YˆÂˆ]\™[H\™Ù]ˆœ\™[
+    /// Returns the UUID bytes stored in the database header.
+    pub const fn database_id(&self) -> [u8; 16] {
+        self.database_id
+    }
 
-Bˆ™š[\Š\™[\\™[˜\×ÛÜ×ÜİŠ
-Kš\×Ù[\J
-JBˆ[Ü˜\ÛÜŠ]›™]Ê‹ˆŠJNÂˆ]š[WÛ˜[YHH\™Ù]ˆ™š[WÛ˜[YJ
-Bˆ›Ú×ÛÜ—Ù[ÙJ\œ›Ü’[˜[Y[œ]
-˜ÛÛ\XİYXÛÜH]™YYÈHš[H˜[YH‹š[Ê
-JJOÎÂˆ]]][\Ü˜\WÛ˜[YHHš[WÛ˜[YK×ÛÜ×Üİš[™Ê
-NÂˆ]Ûİ[\ˆH‘VĞÓÓTPÕSÓ—ÕSTÒQ™™]ÚØY
-KÜ™\š[™Î”™[^Y
-NÂˆ[\Ü˜\WÛ˜[YKœ\Ú
-›Ü›X]J‹œİÙ‹]\^ßK^ØÛİ[\ŸH‹İœ›ØÙ\ÜÎšY
+    /// Reports any incomplete final record discarded during open.
+    pub const fn recovery_report(&self) -> RecoveryReport {
+        self.recovery_report
+    }
 
-JJNÂˆÚÊ\™[š›Ú[Š[\Ü˜\WÛ˜[YJJBŸB‚™›ˆXÜ]Z\™WÛØÚÊš[Nˆ	‘š[JHOˆ™\İ[
+    /// Persists a new collection and returns its database-local identifier.
+    pub fn create_collection(&mut self, name: &str) -> Result<CollectionId> {
+        self.check_usable()?;
+        validate_collection_name(name)?;
+        if self.collections.contains_key(name) {
+            return Err(Error::Duplicate(format!(
+                "collection {name:?} already exists"
+            )));
+        }
+        if self.collections.len() >= MAX_COLLECTIONS {
+            return Err(Error::Limit("collection count reached 10,000".into()));
+        }
+        if self.next_collection_id <= 0 {
+            return Err(Error::Limit(
+                "collection identifier space is exhausted".into(),
+            ));
+        }
 
-OˆÂˆX]Úš[KWÛØÚÊ
-HÂˆÚÊ
+        let collection_id = self.next_collection_id;
+        let payload = encode_collection_create(collection_id, name)?;
+        self.append_record(RecordType::CollectionCreate, &payload)?;
+        self.collections.insert(
+            name.to_owned(),
+            CollectionState {
+                id: collection_id,
+                documents: BTreeMap::new(),
+            },
+        );
+        self.collection_names_by_id
+            .insert(collection_id, name.to_owned());
+        self.next_collection_id = collection_id.checked_add(1).unwrap_or(0);
+        Ok(CollectionId(collection_id))
+    }
 
-JHOˆÚÊ
+    /// Inserts a document and assigns the next positive database-local ID.
+    pub fn insert(&mut self, collection_name: &str, document: Document) -> Result<DocumentId> {
+        self.check_usable()?;
+        if self.document_ids_exhausted || self.next_document_id <= 0 {
+            return Err(Error::Limit(
+                "document identifier space is exhausted".into(),
+            ));
+        }
+        let id = DocumentId(self.next_document_id);
+        self.insert_with_id(collection_name, id, document)?;
+        Ok(id)
+    }
 
-JKˆ\œŠSØÚÑ\œ›Ü•Ûİ[›ØÚÊHOˆ\œŠ\œ›Ü“ØÚÙY
-Kˆ\œŠSØÚÑ\œ›Ü‘\œ›ÜŠ\œ›ÜŠJHOˆ\œŠ\œ›Ü’[Ê\œ›ÜŠJKˆBŸB‚™›ˆ˜[™ÛWÙ]X˜\ÙWÚY
+    /// Inserts a document under a caller-supplied positive identifier.
+    pub fn insert_with_id(
+        &mut self,
+        collection_name: &str,
+        id: DocumentId,
+        document: Document,
+    ) -> Result<()> {
+        self.check_usable()?;
+        let collection_id = self.collection_id(collection_name)?;
+        if self.primary_id_index.contains_key(&id.value()) {
+            return Err(Error::Duplicate(format!("document ID {}", id.value())));
+        }
+        if self.document_count >= MAX_DOCUMENTS {
+            return Err(Error::Limit("active document count reached 100,000".into()));
+        }
+        let payload = encode_document_mutation(collection_id, id, &document)?;
+        self.append_record(RecordType::DocumentInsert, &payload)?;
+        self.collections
+            .get_mut(collection_name)
+            .expect("collection checked above")
+            .documents
+            .insert(id.value(), document);
+        self.primary_id_index.insert(id.value(), collection_id);
+        self.document_count += 1;
+        self.advance_next_document_id(id.value());
+        Ok(())
+    }
 
-HOˆ™\İ[İNÈM—OˆÂˆ]]]YHÌİNÈM—NÂˆÙ]˜[™ÛN™š[
-	›]]Y
-K›X\Ù\œŠ\œ›Ü”˜[™Û[™\ÜÊOÎÂˆYÍ—HH
-YÍ—H	ˆŠHÂˆYÎHH
-YÎH	ˆÙŠHÂˆÚÊY
-BŸB‚ˆÖØÙ™Ê[š^
-WB™›ˆŞ[˜×Ü\™[Ù\™XİÜJ]ˆ	”]
-HOˆ™\İ[
+    /// Reads a document by primary ID from the named collection.
+    pub fn get(&self, collection_name: &str, id: DocumentId) -> Result<Option<&Document>> {
+        self.check_usable()?;
+        let collection_id = self.collection_id(collection_name)?;
+        if self.primary_id_index.get(&id.value()) != Some(&collection_id) {
+            return Ok(None);
+        }
+        Ok(self
+            .collections
+            .get(collection_name)
+            .and_then(|state| state.documents.get(&id.value())))
+    }
 
-OˆÂˆ]\™[H]ˆœ\™[
+    /// Replaces an existing document as one logged operation.
+    pub fn update(
+        &mut self,
+        collection_name: &str,
+        id: DocumentId,
+        document: Document,
+    ) -> Result<bool> {
+        self.check_usable()?;
+        let collection_id = self.collection_id(collection_name)?;
+        if self.primary_id_index.get(&id.value()) != Some(&collection_id) {
+            return Ok(false);
+        }
+        let payload = encode_document_mutation(collection_id, id, &document)?;
+        self.append_record(RecordType::DocumentUpdate, &payload)?;
+        self.collections
+            .get_mut(collection_name)
+            .expect("collection checked above")
+            .documents
+            .insert(id.value(), document);
+        Ok(true)
+    }
 
-Bˆ™š[\Š\™[\\™[˜\×ÛÜ×ÜİŠ
-Kš\×Ù[\J
-JBˆ[Ü˜\ÛÜŠ]›™]Ê‹ˆŠJNÂˆš[N›Ü[Š\™[
-OËœŞ[˜×Ø[
+    /// Deletes an existing document as one logged operation.
+    pub fn delete(&mut self, collection_name: &str, id: DocumentId) -> Result<bool> {
+        self.check_usable()?;
+        let collection_id = self.collection_id(collection_name)?;
+        if self.primary_id_index.get(&id.value()) != Some(&collection_id) {
+            return Ok(false);
+        }
+        let mut payload = Vec::with_capacity(16);
+        payload.extend_from_slice(&collection_id.to_be_bytes());
+        payload.extend_from_slice(&id.value().to_be_bytes());
+        self.append_record(RecordType::DocumentDelete, &payload)?;
+        self.collections
+            .get_mut(collection_name)
+            .expect("collection checked above")
+            .documents
+            .remove(&id.value());
+        self.primary_id_index.remove(&id.value());
+        self.document_count -= 1;
+        Ok(true)
+    }
 
-OÎÂˆÚÊ
+    /// Returns active IDs in ascending order.
+    pub fn document_ids(&self, collection_name: &str) -> Result<Vec<DocumentId>> {
+        self.check_usable()?;
+        let collection = self.collection(collection_name)?;
+        Ok(collection
+            .documents
+            .keys()
+            .copied()
+            .map(DocumentId)
+            .collect())
+    }
 
-JBŸB‚ˆÖØÙ™Ê›İ
-[š^
-JWB™›ˆŞ[˜×Ü\™[Ù\™XİÜJÜ]ˆ	”]
-HOˆ™\İ[
+    /// Returns collection names in ascending order.
+    pub fn collection_names(&self) -> Result<Vec<String>> {
+        self.check_usable()?;
+        let mut names: Vec<_> = self.collections.keys().cloned().collect();
+        names.sort();
+        Ok(names)
+    }
 
-OˆÂˆËÈ\İ	ÜÈÜX›Hš[HTH\È›È\™XİÜK\Ş[˜ÈÜ\˜][ÛˆÛˆÚ[™İÜË‚ˆÚÊ
+    /// Writes a compacted, byte-compatible copy without replacing this database.
+    ///
+    /// The new file preserves collection/document IDs and the database UUID, but
+    /// rewrites only currently active documents. It is published without
+    /// overwriting an existing destination. The destination filesystem must
+    /// support hard links; otherwise this returns an I/O error and leaves this
+    /// database unchanged.
+    pub fn write_compacted_copy(&self, target: impl AsRef<Path>) -> Result<()> {
+        self.check_usable()?;
+        let target = absolute_path(target.as_ref())?;
+        if target == self.path {
+            return Err(Error::InvalidInput(
+                "compacted copy must use a different path".into(),
+            ));
+        }
+        if target.exists() {
+            return Err(Error::Duplicate(format!(
+                "compacted-copy destination already exists: {}",
+                target.display()
+            )));
+        }
+        let temporary = temporary_sibling_path(&target)?;
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)?;
 
-JBŸB‚ˆÖØÙ™Ê™X]\™HH˜Ü˜\Ú]\İŠWB™›ˆÜ˜\ÚØ™Y›Ü™WİÜš]J
-HÂˆÜ˜\ÚÜ]\ÙWÚYŠ˜™Y›Ü™WİÜš]HŠNÂŸB‚ˆÖØÙ™Ê›İ
-™X]\™HH˜Ü˜\Ú]\İŠJWB™›ˆÜ˜\ÚØ™Y›Ü™WİÜš]J
-HßB‚ˆÖØÙ™Ê™X]\™HH˜Ü˜\Ú]\İŠWB™›ˆÜ˜\ÚÙ\š[™×İÜš]J
-HOˆ›ÛÛÂˆİ™[˜\Š”ÑPUÓÔ“ĞÔTÒĞUŠKš\×ÛÚ×Ø[™
-Ú[Ú[OH™\š[™×İÜš]HŠBŸB‚ˆÖØÙ™Ê›İ
-™X]\™HH˜Ü˜\Ú]\İŠJWB™›ˆÜ˜\ÚÙ\š[™×İÜš]J
-HOˆ›ÛÛÂˆ˜[ÙBŸB‚ˆÖØÙ™Ê™X]\™HH˜Ü˜\Ú]\İŠWB™›ˆÜ˜\ÚØY\—İÜš]J
-HÂˆÜ˜\ÚÜ]\ÙWÚYŠ˜Y\—İÜš]WØ™Y›Ü™WÜŞ[˜ÈŠNÂŸB‚ˆÖØÙ™Ê›İ
-™X]\™HH˜Ü˜\Ú]\İŠJWB™›ˆÜ˜\ÚØY\—İÜš]J
-HßB‚ˆÖØÙ™Ê™X]\™HH˜Ü˜\Ú]\İŠWB™›ˆÜ˜\ÚØY\—ÜŞ[˜Ê
-HÂˆÜ˜\ÚÜ]\ÙWÚYŠ˜Y\—ÜŞ[˜×Ø™Y›Ü™WÜ™]\›ˆŠNÂŸB‚ˆÖØÙ™Ê›İ
-™X]\™HH˜Ü˜\Ú]\İŠJWB™›ˆÜ˜\ÚØY\—ÜŞ[˜Ê
-HßB‚ˆÖØÙ™Ê™X]\™HH˜Ü˜\Ú]\İŠWB™›ˆÜ˜\ÚÜ]\ÙWÚYŠÚ[ˆ	œİŠHÂˆYˆİ™[˜\Š”ÑPUÓÔ“ĞÔTÒĞUŠKš\×ÛÚ×Ø[™
-ÛÛ™šYİ\™YÛÛ™šYİ\™YOHÚ[
-HÂˆÜ˜\ÚÜ]\ÙJÚ[
-NÂˆBŸB‚ˆÖØÙ™Ê™X]\™HH˜Ü˜\Ú]\İŠWB™›ˆÜ˜\ÚÜ]\ÙJÚ[ˆ	œİŠHOˆHÂˆYˆ]ÛÛYJX\šÙ\ŠHHİ™[˜\—ÛÜÊ”ÑPUÓÔ“ĞÔTÒÔ‘PQWÑ’SHŠBˆ	‰ˆ]\œŠ\œ›ÜŠHHİ™œÎÜš]JX\šÙ\‹Ú[˜\×Ø]\Ê
-JBˆÂˆ\š[ˆJ˜Ûİ[›İÜš]HÜ˜\Ú]\İX\šÙ\ˆÙ\œ›ÜŸHŠNÂˆİœ›ØÙ\ÜÎ™^]
-ÊNÂˆBˆÛÜÂˆİ™XYœÛY\
-İ[YN‘\˜][Û™œ›ÛWÜÙXÜÊŒ
-JNÂˆBŸB‚ˆÖØÙ™Ê›İ
-™X]\™HH˜Ü˜\Ú]\İŠJWB™›ˆÜ˜\ÚÜ]\ÙJÜÚ[ˆ	œİŠHOˆHÂˆ[œ™XXÚX›HJ˜Ü˜\ÚÚ[È\™H\ØX›YÚ]İ]HÜ˜\Ú]\İ™X]\™HŠBŸB‚ˆÖØÙ™Ê\İ
-WB›[Ù\İÈÂˆ\ÙHİ\\ŠÂ‚ˆÖİ\İBˆ›ˆÛÛXİ[Û—İ˜[Y][Û—ÛX]Ú\×Ø\ØÚZWÛ˜[YWÙÜ˜[[X\Š
-HÂˆ\ÜÙ\J˜[Y]WØÛÛXİ[Û—Û˜[YJ\Ù\œÈŠKš\×ÛÚÊ
-JNÂˆ\ÜÙ\J˜[Y]WØÛÛXİ[Û—Û˜[YJ—Üš]˜]KLˆŠKš\×ÛÚÊ
-JNÂˆ\ÜÙ\J˜[Y]WØÛÛXİ[Û—Û˜[YJ‹‹‹İ\Ù\œÈŠKš\×Ù\œŠ
-JNÂˆ\ÜÙ\J˜[Y]WØÛÛXİ[Û—Û˜[YJ°ïÙ\ˆŠKš\×Ù\œŠ
-JNÂˆ\ÜÙ\J˜[Y]WØÛÛXİ[Û—Û˜[YJ	ˆ˜H‹œ™\X]
-
-JKš\×Ù\œŠ
-JNÂˆB‚ˆÖİ\İBˆ›ˆ™XÛÜ™ØÜ˜×ØÛİ™\œ×Ü™Yš^Ø[™Ü^[ØY
+        let write_result = (|| -> Result<()> {
+            file.write_all(&format::encode_header(self.database_id))?;
+            let mut file_size = HEADER_SIZE as u64;
+            let mut sequence = 1_i64;
+            let mut collections: Vec<_> = self
+                .collection_names_by_id
+                .iter()
+                .map(|(id, name)| (*id, name.as_str()))
+                .collect();
+            collections.sort_unstable_by_key(|(id, _)| *id);
+            if collections.len() > MAX_COLLECTIONS {
+                return Err(Error::Integrity(
+                    "in-memory collection count exceeds the file limit".into(),
+                ));
+            }
 
-HÂˆ]™XÛÜ™H[˜ÛÙWÜ™XÛÜ™
-™XÛÜ™\NÛÛXİ[ÛÜ™X]KKˆ\İŠK[Ü˜\
+            let mut expected_collection_id = 1_i64;
+            for (collection_id, name) in collections {
+                if collection_id != expected_collection_id {
+                    return Err(Error::Integrity(
+                        "collection IDs are not contiguous during compaction".into(),
+                    ));
+                }
+                expected_collection_id = expected_collection_id
+                    .checked_add(1)
+                    .ok_or_else(|| Error::Limit("collection identifier overflow".into()))?;
+                let collection = self.collections.get(name).ok_or_else(|| {
+                    Error::Integrity("collection ID map is inconsistent during compaction".into())
+                })?;
+                if collection.id != collection_id {
+                    return Err(Error::Integrity(
+                        "collection ID map is inconsistent during compaction".into(),
+                    ));
+                }
+                write_snapshot_record(
+                    &mut file,
+                    &mut sequence,
+                    &mut file_size,
+                    RecordType::CollectionCreate,
+                    &encode_collection_create(collection_id, name)?,
+                )?;
+                for (document_id, document) in &collection.documents {
+                    write_snapshot_record(
+                        &mut file,
+                        &mut sequence,
+                        &mut file_size,
+                        RecordType::DocumentInsert,
+                        &encode_document_mutation(
+                            collection_id,
+                            DocumentId(*document_id),
+                            document,
+                        )?,
+                    )?;
+                }
+            }
+            file.sync_all()?;
+            Ok(())
+        })();
+        drop(file);
+        if let Err(error) = write_result {
+            let _ = fs::remove_file(&temporary);
+            return Err(error);
+        }
 
-NÂˆ]İÜ™YHLÌ™œ›ÛWØ™WØ]\Ê™XÛÜ™Ü™XÛÜ™›[Š
-HH‹—KWÚ[Ê
-K[Ü˜\
+        if let Err(error) = fs::hard_link(&temporary, &target) {
+            let _ = fs::remove_file(&temporary);
+            return Err(Error::Io(error));
+        }
+        if let Err(error) = sync_parent_directory(&target) {
+            let _ = fs::remove_file(&temporary);
+            return Err(error);
+        }
+        let _ = fs::remove_file(&temporary);
+        let _ = sync_parent_directory(&target);
+        Ok(())
+    }
 
-JNÂˆ\ÜÙ\Ù\HJİÜ™Y›Ü›X]˜Ü˜ÌÌ˜Ê	œ™XÛÜ™Ë‹œ™XÛÜ™›[Š
-HHJJNÂˆBŸB
+    /// Synchronizes the database and releases its exclusive file lock.
+    pub fn close(self) -> Result<()> {
+        let sync_result = self.file.sync_all();
+        let unlock_result = self.file.unlock();
+        match (sync_result, unlock_result) {
+            (Err(error), _) => Err(Error::Io(error)),
+            (Ok(()), Err(error)) => Err(Error::Io(error)),
+            (Ok(()), Ok(())) => Ok(()),
+        }
+    }
+
+    fn replay_records(&mut self, file_size: u64) -> Result<()> {
+        let mut offset = HEADER_SIZE as u64;
+        while offset < file_size {
+            let remaining = file_size - offset;
+            if remaining < RECORD_PREFIX_SIZE as u64 {
+                return self.recover_incomplete_tail(offset, file_size);
+            }
+
+            self.file.seek(SeekFrom::Start(offset))?;
+            let mut prefix = [0_u8; RECORD_PREFIX_SIZE];
+            self.file.read_exact(&mut prefix).map_err(|error| {
+                if error.kind() == std::io::ErrorKind::UnexpectedEof {
+                    Error::Integrity("database changed or truncated while opening".into())
+                } else {
+                    Error::Io(error)
+                }
+            })?;
+            if &prefix[..4] != RECORD_MAGIC {
+                return Err(Error::Integrity(format!(
+                    "invalid record magic at offset {offset}"
+                )));
+            }
+            let type_code = prefix[4];
+            if prefix[5] != 0 || prefix[6] != 0 || prefix[7] != 0 {
+                return Err(Error::Format(format!(
+                    "unsupported record flags at offset {offset}"
+                )));
+            }
+            let block_length = i32::from_be_bytes(prefix[8..12].try_into().expect("prefix range"));
+            if block_length < MIN_RECORD_SIZE as i32 || block_length as usize > MAX_RECORD_SIZE {
+                return Err(Error::Format(format!(
+                    "record length is out of bounds at offset {offset}"
+                )));
+            }
+            if block_length as u64 > remaining {
+                return self.recover_incomplete_tail(offset, file_size);
+            }
+            let sequence = i64::from_be_bytes(prefix[12..20].try_into().expect("prefix range"));
+            let block_length = block_length as usize;
+            let mut block = vec![0_u8; block_length];
+            block[..RECORD_PREFIX_SIZE].copy_from_slice(&prefix);
+            self.file
+                .read_exact(&mut block[RECORD_PREFIX_SIZE..])
+                .map_err(|error| {
+                    if error.kind() == std::io::ErrorKind::UnexpectedEof {
+                        Error::Integrity("database changed or truncated while opening".into())
+                    } else {
+                        Error::Io(error)
+                    }
+                })?;
+            let checksum_offset = block_length - format::RECORD_TRAILER_SIZE;
+            let stored_checksum = u32::from_be_bytes(
+                block[checksum_offset..]
+                    .try_into()
+                    .expect("record checksum range"),
+            );
+            if stored_checksum != format::crc32c(&block[..checksum_offset]) {
+                return Err(Error::Integrity(format!(
+                    "record checksum mismatch at offset {offset}"
+                )));
+            }
+            if sequence != self.next_sequence {
+                return Err(Error::Integrity(format!(
+                    "unexpected record sequence at offset {offset}"
+                )));
+            }
+            if self.next_sequence == i64::MAX {
+                return Err(Error::Integrity(
+                    "record sequence space is exhausted".into(),
+                ));
+            }
+            let record_type = RecordType::from_code(type_code)?;
+            let payload = &block[RECORD_PREFIX_SIZE..checksum_offset];
+            self.replay_record(record_type, payload)?;
+            self.next_sequence += 1;
+            offset += block_length as u64;
+        }
+        Ok(())
+    }
+
+    fn replay_record(&mut self, record_type: RecordType, payload: &[u8]) -> Result<()> {
+        let mut input = Cursor::new(payload);
+        match record_type {
+            RecordType::CollectionCreate => {
+                let collection_id = input.i64("collection identifier")?;
+                if collection_id <= 0 || collection_id != self.next_collection_id {
+                    return Err(Error::Integrity(
+                        "invalid collection identifier in record".into(),
+                    ));
+                }
+                let name = input.string(COLLECTION_NAME_MAX_BYTES, "collection name")?;
+                validate_collection_name(&name)
+                    .map_err(|_| Error::Integrity("invalid collection name in record".into()))?;
+                input.finish("collection record")?;
+                if self.collections.contains_key(&name) || self.collections.len() >= MAX_COLLECTIONS
+                {
+                    return Err(Error::Integrity(
+                        "duplicate collection or collection limit exceeded".into(),
+                    ));
+                }
+                self.collections.insert(
+                    name.clone(),
+                    CollectionState {
+                        id: collection_id,
+                        documents: BTreeMap::new(),
+                    },
+                );
+                self.collection_names_by_id.insert(collection_id, name);
+                self.next_collection_id = collection_id.checked_add(1).unwrap_or(0);
+            }
+            RecordType::DocumentInsert | RecordType::DocumentUpdate => {
+                let (collection_id, document_id, document) = decode_document_mutation(&mut input)?;
+                let name = self
+                    .collection_names_by_id
+                    .get(&collection_id)
+                    .ok_or_else(|| {
+                        Error::Integrity("document record names an unknown collection".into())
+                    })?
+                    .clone();
+                let current_owner = self.primary_id_index.get(&document_id).copied();
+                if record_type == RecordType::DocumentInsert {
+                    if current_owner.is_some() {
+                        return Err(Error::Integrity("duplicate document ID in file".into()));
+                    }
+                    if self.document_count >= MAX_DOCUMENTS {
+                        return Err(Error::Integrity(
+                            "active document limit exceeded in file".into(),
+                        ));
+                    }
+                    self.collections
+                        .get_mut(&name)
+                        .expect("collection map checked")
+                        .documents
+                        .insert(document_id, document);
+                    self.primary_id_index.insert(document_id, collection_id);
+                    self.document_count += 1;
+                    self.advance_next_document_id(document_id);
+                } else {
+                    if current_owner != Some(collection_id) {
+                        return Err(Error::Integrity(
+                            "update record names an unknown document".into(),
+                        ));
+                    }
+                    self.collections
+                        .get_mut(&name)
+                        .expect("collection map checked")
+                        .documents
+                        .insert(document_id, document);
+                }
+            }
+            RecordType::DocumentDelete => {
+                let collection_id = input.i64("delete collection identifier")?;
+                let document_id = input.i64("delete document identifier")?;
+                input.finish("delete record")?;
+                if document_id <= 0
+                    || self.primary_id_index.get(&document_id) != Some(&collection_id)
+                {
+                    return Err(Error::Integrity(
+                        "delete record names an unknown document".into(),
+                    ));
+                }
+                let name = self
+                    .collection_names_by_id
+                    .get(&collection_id)
+                    .ok_or_else(|| {
+                        Error::Integrity("delete record names an unknown collection".into())
+                    })?
+                    .clone();
+                self.collections
+                    .get_mut(&name)
+                    .expect("collection map checked")
+                    .documents
+                    .remove(&document_id);
+                self.primary_id_index.remove(&document_id);
+                self.document_count -= 1;
+            }
+        }
+        Ok(())
+    }
+
+    fn recover_incomplete_tail(&mut self, last_good_offset: u64, original_size: u64) -> Result<()> {
+        self.file.set_len(last_good_offset)?;
+        self.file.sync_all()?;
+        self.recovery_report = RecoveryReport {
+            discarded_bytes: original_size - last_good_offset,
+        };
+        Ok(())
+    }
+
+    fn append_record(&mut self, record_type: RecordType, payload: &[u8]) -> Result<()> {
+        if self.next_sequence <= 0 || self.next_sequence == i64::MAX {
+            return Err(Error::Limit("record sequence space is exhausted".into()));
+        }
+        let total_length = MIN_RECORD_SIZE
+            .checked_add(payload.len())
+            .ok_or_else(|| Error::Limit("record length overflow".into()))?;
+        if total_length > MAX_RECORD_SIZE {
+            return Err(Error::Limit(
+                "record exceeds the 17 MiB maximum block size".into(),
+            ));
+        }
+        let current_size = self.file.metadata()?.len();
+        if current_size
+            .checked_add(total_length as u64)
+            .is_none_or(|size| size > MAX_DATABASE_BYTES)
+        {
+            return Err(Error::Limit(
+                "database file size limit reached; write a compacted copy and switch files manually".into(),
+            ));
+        }
+        let block = encode_record(record_type, self.next_sequence, payload)?;
+        self.file.seek(SeekFrom::End(0))?;
+        let write_result = (|| -> std::io::Result<()> {
+            crash_before_write();
+            if crash_during_write() {
+                self.file.write_all(&block[..(block.len() / 2).max(1)])?;
+                crash_pause("during_write");
+            }
+            self.file.write_all(&block)?;
+            crash_after_write();
+            self.file.sync_all()?;
+            crash_after_sync();
+            Ok(())
+        })();
+        if let Err(error) = write_result {
+            self.write_failed = true;
+            return Err(Error::Io(error));
+        }
+        self.next_sequence += 1;
+        Ok(())
+    }
+
+    fn collection_id(&self, name: &str) -> Result<i64> {
+        validate_collection_name(name)?;
+        self.collections
+            .get(name)
+            .map(|state| state.id)
+            .ok_or_else(|| Error::NotFound(format!("collection {name:?}")))
+    }
+
+    fn collection(&self, name: &str) -> Result<&CollectionState> {
+        validate_collection_name(name)?;
+        self.collections
+            .get(name)
+            .ok_or_else(|| Error::NotFound(format!("collection {name:?}")))
+    }
+
+    fn advance_next_document_id(&mut self, used_id: i64) {
+        if used_id >= self.next_document_id {
+            if used_id == i64::MAX {
+                self.document_ids_exhausted = true;
+            } else {
+                self.next_document_id = used_id + 1;
+            }
+        }
+    }
+
+    fn check_usable(&self) -> Result<()> {
+        if self.write_failed {
+            return Err(Error::Io(std::io::Error::other(
+                "a prior append failed; close and reopen the database",
+            )));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RecordType {
+    CollectionCreate,
+    DocumentInsert,
+    DocumentUpdate,
+    DocumentDelete,
+}
+
+impl RecordType {
+    const fn code(self) -> u8 {
+        match self {
+            Self::CollectionCreate => 1,
+            Self::DocumentInsert => 2,
+            Self::DocumentUpdate => 3,
+            Self::DocumentDelete => 4,
+        }
+    }
+
+    fn from_code(code: u8) -> Result<Self> {
+        match code {
+            1 => Ok(Self::CollectionCreate),
+            2 => Ok(Self::DocumentInsert),
+            3 => Ok(Self::DocumentUpdate),
+            4 => Ok(Self::DocumentDelete),
+            _ => Err(Error::Format(format!("unknown record t
