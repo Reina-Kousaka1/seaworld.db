@@ -2,7 +2,7 @@
 
 SeaWorld DB is experimental software and is not suitable for production use. Only the current `main` branch and the current `0.0.x` development line are supported; there are no stable release branches or guaranteed patch windows.
 
-Do not post exploit details, malicious database files, secrets, or personal data in public issues. If GitHub Private Vulnerability Reporting is enabled for this repository, use the private report flow from the repository's Security tab. This repository does not publish a private email address or response-time commitment. If no private GitHub report route is available, ask the repository maintainer to establish a private reporting channel before sending sensitive details.
+Report vulnerabilities through GitHub Private Vulnerability Reporting for this repository, using the private report flow from the Security tab. Do not post exploit details, malicious database files, secrets, or personal data in public issues. If the private report option is not visible, ask a repository maintainer to enable it before sending sensitive details. This repository does not publish a private email address or response-time commitment.
 
 A useful report includes:
 
