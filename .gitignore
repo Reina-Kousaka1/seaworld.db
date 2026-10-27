@@ -1,8 +1,6 @@
-# Java build output
+# Build output
 /build/
-/out/
 /target/
-*.class
 
 # SeaWorld database files and transient files
 *.seaworld.db

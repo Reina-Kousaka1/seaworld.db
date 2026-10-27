@@ -15,7 +15,9 @@ SeaWorld DB is versioned as `0.0.x` while the file format, recovery, and API are
 - [x] Migrate the engine core to Rust while preserving the version 1 file format.
 - [x] Keep a Java-generated file fixture and compare Rust record bytes against it.
 - [x] Add process crash injection around append and sync, then verify repeatable tail recovery.
-- [x] Run Rust CI on Linux and Windows; retain the Java reference suite through the compatibility gate.
+- [x] Pass Rust CI on Linux and Windows while retaining the Java reference suite.
+- [x] Remove the Java engine, Java tests, and transitional Java CI after the Rust compatibility gate passed.
+- [x] Add a safe compacted-copy writer that preserves the source and never overwrites its destination.
 
 ## Next engine wave
 

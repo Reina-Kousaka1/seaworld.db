@@ -10,7 +10,7 @@ The engine is being built in Rust around its own document model, query represent
 
 Current development version: `0.0.1-dev`.
 
-The initial milestone is a small embedded engine that writes its own versioned database file, persists collections and documents, and reads them after close and reopen. Rust reads and writes the version 1 format; a checked-in Java-generated fixture and byte comparison protect compatibility with the original implementation. See [the roadmap](docs/roadmap.md) for implemented and planned work.
+The initial milestone is a small embedded engine that writes its own versioned database file, persists collections and documents, and reads them after close and reopen. Rust reads and writes the version 1 format; a checked-in fixture produced by the former Java implementation and a byte comparison protect compatibility with the original format. The Java engine and its test suite were removed after the Rust CI compatibility gate passed. See [the roadmap](docs/roadmap.md) for implemented and planned work.
 
 SeaWorld DB does not claim production readiness, full ACID compliance, a complete SQL implementation, distribution, or production security. Crash recovery and durability guarantees are limited to the documented behavior and tested environments.
 
@@ -29,7 +29,7 @@ cargo test --all-targets --features crash-test
 cargo build --release
 ```
 
-The only direct runtime dependency is `getrandom`, used to create the non-secret database UUID from the operating system random source. Dependency versions are locked in `Cargo.lock`. CI runs formatting, Clippy, tests, and a release build on Linux and Windows; it also runs the original Java suite during the migration compatibility window.
+The only direct runtime dependency is `getrandom`, used to create the non-secret database UUID from the operating system random source. Dependency versions are locked in `Cargo.lock`. CI runs formatting, Clippy, tests, and a release build on Linux and Windows.
 
 ## Data files
 
