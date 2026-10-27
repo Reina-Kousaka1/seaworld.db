@@ -271,11 +271,11 @@ fn v1_remains_writable_and_upgrades_only_to_a_new_v2_file() {
 
     let original_id = database.database_id();
     database.write_v2_compacted_copy(&target.path).unwrap();
+    database.close().unwrap();
     assert_eq!(
         &fs::read(&source.path).unwrap()[8..10],
         &1_u16.to_be_bytes()
     );
-    database.close().unwrap();
 
     let mut upgraded = Database::open(&target.path).unwrap();
     assert_eq!(upgraded.format_version(), 2);
