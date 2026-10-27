@@ -308,3 +308,73 @@ fn validate_field_name(field: &str) -> std::result::Result<(), &'static str> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use proptest::prelude::*;
+
+    use super::{decode_document, encode_document};
+    use crate::{Document, Value};
+
+    fn scalar_value_strategy() -> BoxedStrategy<Value> {
+        prop_oneof![
+            Just(Value::Null),
+            any::<bool>().prop_map(Value::Bool),
+            any::<i64>().prop_map(Value::Integer),
+            any::<f64>()
+                .prop_filter("floating point values must be finite", |value| value.is_finite())
+                .prop_map(Value::Float),
+            "[a-zA-Z0-9 _.-]{0,48}".prop_map(|value| Value::String(value.to_string())),
+            proptest::collection::vec(any::<u8>(), 0..=48).prop_map(Value::Binary),
+        ]
+        .boxed()
+    }
+
+    fn value_strategy() -> BoxedStrategy<Value> {
+        scalar_value_strategy()
+            .prop_recursive(3, 64, 8, |inner| {
+                prop_oneof![
+                    proptest::collection::vec(inner.clone(), 0..=5).prop_map(Value::Array),
+                    proptest::collection::btree_map(
+                        "[a-z][a-z0-9_]{0,7}",
+                        inner,
+                        0..=5
+                    )
+                    .prop_map(Value::Object),
+                ]
+                .boxed()
+            })
+            .boxed()
+    }
+
+    fn document_strategy() -> impl Strategy<Value = Document> {
+        proptest::collection::btree_map(
+            "[a-z][a-z0-9_]{0,7}",
+            value_strategy(),
+            0..=8,
+        )
+        .prop_map(Document::new)
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::test_runner::Config {
+            cases: 64,
+            max_shrink_iters: 2_000,
+            ..proptest::test_runner::Config::default()
+        })]
+
+        #[test]
+        fn generated_documents_round_trip_through_the_codec(document in document_strategy()) {
+            let encoded = encode_document(&document).unwrap();
+            proptest::prop_assert_eq!(decode_document(&encoded).unwrap(), document);
+        }
+
+        #[test]
+        fn generated_malformed_document_bytes_never_panic(
+            bytes in proptest::collection::vec(proptest::prelude::any::<u8>(), 0..=512)
+        ) {
+            let outcome = std::panic::catch_unwind(|| decode_document(&bytes));
+            proptest::prop_assert!(outcome.is_ok(), "decoder panicked on {} bytes", bytes.len());
+        }
+    }
+}

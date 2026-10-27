@@ -345,6 +345,52 @@ fn rollback_discards_staged_state_and_reuses_provisional_ids() {
 }
 
 #[test]
+fn recovery_rejects_invalid_transaction_state_without_mutating_the_file() {
+    let malformed_logs: &[(&str, &[(u8, i64)])] = &[
+        ("commit without begin", &[(6, 1)]),
+        ("nested begin", &[(5, 1), (5, 2)]),
+        ("mismatched commit ID", &[(5, 1), (6, 2)]),
+        ("duplicate commit", &[(5, 1), (6, 1), (6, 1)]),
+        ("zero transaction ID", &[(5, 0)]),
+        ("out-of-order transaction ID", &[(5, 2)]),
+        ("mutation outside transaction", &[(2, 1)]),
+    ];
+
+    for format_version in [2, 3, 4] {
+        for (case, records) in malformed_logs {
+            let temp = TempDatabase::new();
+            let database = match format_version {
+                2 => Database::create_v2(&temp.path).unwrap(),
+                3 => Database::create_v3(&temp.path).unwrap(),
+                4 => Database::create(&temp.path).unwrap(),
+                _ => unreachable!(),
+            };
+            database.close().unwrap();
+
+            for (index, (kind, transaction_id)) in records.iter().enumerate() {
+                append_record(
+                    &temp.path,
+                    *kind,
+                    index as i64 + 1,
+                    &transaction_id.to_be_bytes(),
+                );
+            }
+            let malformed_bytes = fs::read(&temp.path).unwrap();
+
+            assert!(
+                matches!(Database::open(&temp.path), Err(Error::Integrity(_))),
+                "V{format_version} accepted {case}"
+            );
+            assert_eq!(
+                fs::read(&temp.path).unwrap(),
+                malformed_bytes,
+                "V{format_version} modified the file after {case}"
+            );
+        }
+    }
+}
+
+#[test]
 fn secondary_and_unique_indexes_persist_and_enforce_constraints() {
     let temp = TempDatabase::new();
     let mut database = Database::create(&temp.path).unwrap();

@@ -15,7 +15,7 @@ use std::{
 
 use seaworld_db::{
     CompareOp, Database, Document, DocumentId, Error, FieldPath, Filter, Query, QueryPlan,
-    SortDirection, Value,
+    SortDirection, Transaction, Value,
 };
 
 static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(1);
@@ -152,6 +152,68 @@ fn assert_index_matches_full_scan(indexed: &Database, full_scan: &Database, seed
             "initial seed {DIFFERENTIAL_SEED:#x}, generator state {seed:#x}"
         );
     }
+}
+
+fn apply_generated_operation(
+    transaction: &mut Transaction<'_>,
+    model: &mut BTreeMap<i64, Option<Value>>,
+    operation: (u8, i64, u64),
+) {
+    let (kind, raw_id, value_seed) = operation;
+    let id = DocumentId::new(raw_id).unwrap();
+    match kind % 3 {
+        0 if !model.contains_key(&raw_id) => {
+            let value = generated_value(value_seed);
+            transaction
+                .insert_with_id("items", id, scalar_document(value.clone()))
+                .unwrap();
+            model.insert(raw_id, value);
+        }
+        1 if model.contains_key(&raw_id) => {
+            let value = generated_value(value_seed);
+            assert!(
+                transaction
+                    .update("items", id, scalar_document(value.clone()))
+                    .unwrap()
+            );
+            model.insert(raw_id, value);
+        }
+        2 if model.contains_key(&raw_id) => {
+            assert!(transaction.delete("items", id).unwrap());
+            model.remove(&raw_id);
+        }
+        _ => {}
+    }
+}
+
+fn assert_generated_query_results_match(
+    indexed: &Database,
+    full_scan: &Database,
+    value: &Value,
+) -> proptest::test_runner::TestCaseResult {
+    let path = FieldPath::parse("value").unwrap();
+    for op in [
+        CompareOp::Eq,
+        CompareOp::Ne,
+        CompareOp::Lt,
+        CompareOp::Lte,
+        CompareOp::Gt,
+        CompareOp::Gte,
+    ] {
+        let query = Query::new(
+            "items",
+            Filter::Compare {
+                path: path.clone(),
+                op,
+                value: value.clone(),
+            },
+        );
+        proptest::prop_assert_eq!(
+            normalized_rows(indexed, &query),
+            normalized_rows(full_scan, &query)
+        );
+    }
+    Ok(())
 }
 
 #[test]
@@ -472,6 +534,84 @@ fn seeded_mutations_keep_indexed_queries_equal_to_full_scan_before_and_after_reo
     let indexed = Database::open(&indexed_file.0).unwrap();
     let full_scan = Database::open(&full_scan_file.0).unwrap();
     assert_index_matches_full_scan(&indexed, &full_scan, seed);
+}
+
+proptest::proptest! {
+    #![proptest_config(proptest::test_runner::Config {
+        cases: 16,
+        max_shrink_iters: 2_000,
+        ..proptest::test_runner::Config::default()
+    })]
+
+    #[test]
+    fn generated_transaction_sequence_matches_committed_model(
+        batches in proptest::collection::vec(
+            (
+                proptest::prelude::any::<bool>(),
+                proptest::collection::vec(
+                    (0_u8..=2, 1_i64..=16, 0_u64..=127),
+                    0..=6
+                )
+            ),
+            0..=8
+        )
+    ) {
+        let indexed_file = TempDatabase::new();
+        let full_scan_file = TempDatabase::new();
+        let mut indexed = Database::create(&indexed_file.0).unwrap();
+        let mut full_scan = Database::create(&full_scan_file.0).unwrap();
+        indexed.create_collection("items").unwrap();
+        full_scan.create_collection("items").unwrap();
+        indexed.create_index("items", "value").unwrap();
+        let mut model = BTreeMap::<i64, Option<Value>>::new();
+
+        for (commit, operations) in batches {
+            let mut indexed_model = model.clone();
+            let mut full_scan_model = model.clone();
+            let mut indexed_transaction = indexed.begin_transaction().unwrap();
+            let mut scan_transaction = full_scan.begin_transaction().unwrap();
+            for operation in operations {
+                apply_generated_operation(&mut indexed_transaction, &mut indexed_model, operation);
+                apply_generated_operation(&mut scan_transaction, &mut full_scan_model, operation);
+                proptest::prop_assert_eq!(indexed_model, full_scan_model);
+            }
+
+            if commit {
+                indexed_transaction.commit().unwrap();
+                scan_transaction.commit().unwrap();
+                model = indexed_model;
+            } else {
+                indexed_transaction.rollback();
+                scan_transaction.rollback();
+            }
+
+            let all = Query::new("items", Filter::All);
+            let expected: Vec<_> = model
+                .iter()
+                .map(|(id, value)| (*id, scalar_document(value.clone())))
+                .collect();
+            proptest::prop_assert_eq!(normalized_rows(&indexed, &all), expected);
+            proptest::prop_assert_eq!(normalized_rows(&full_scan, &all), expected);
+        }
+
+        let sample_value = model
+            .values()
+            .find_map(|value| value.clone())
+            .unwrap_or(Value::Null);
+        assert_generated_query_results_match(&indexed, &full_scan, &sample_value)?;
+        indexed.close().unwrap();
+        full_scan.close().unwrap();
+        let indexed = Database::open(&indexed_file.0).unwrap();
+        let full_scan = Database::open(&full_scan_file.0).unwrap();
+        let all = Query::new("items", Filter::All);
+        let expected: Vec<_> = model
+            .iter()
+            .map(|(id, value)| (*id, scalar_document(value.clone())))
+            .collect();
+        proptest::prop_assert_eq!(normalized_rows(&indexed, &all), expected);
+        proptest::prop_assert_eq!(normalized_rows(&full_scan, &all), expected);
+        assert_generated_query_results_match(&indexed, &full_scan, &sample_value)?;
+    }
 }
 
 #[test]
