@@ -10,6 +10,8 @@ The first release is embedded-first: an application opens a local `*.seaworld.db
 
 The engine core is implemented in stable Rust. `Cargo.toml` declares Rust 1.89 as its minimum version. Rust is the engine implementation language; future drivers can target Java, Python, JavaScript/TypeScript, Tyvera, and other hosts without changing that boundary.
 
+V1 remains byte-for-byte supported. New databases use the explicitly versioned V2 grammar for transactions and index metadata. V1 handles keep single-operation CRUD and can be copied to V2 through a non-overwriting migration path before using transactions or indexes.
+
 | Area | C++ | Rust | Java 21 |
 | --- | --- | --- | --- |
 | Memory safety | RAII and modern ownership types help manage resources, but bounds and lifetime errors remain possible in unsafe code. | Ownership and borrowing prevent many memory errors at compile time without a garbage collector. | Managed memory prevents ordinary pointer misuse; heap use and garbage collection need to be considered for an embedded engine. |
@@ -50,16 +52,16 @@ Application
                      *.seaworld.db
 ```
 
-The query engine will consume SeaWorld's own query representation. Adapters translate native API calls or the supported SQL subset into that representation. They do not implement independent storage paths. The current Rust API provides document and collection operations, not the planned filter AST or SQL parser.
+The query engine consumes SeaWorld's own typed query representation. Adapters translate native API calls or a future supported SQL subset into that representation. They do not implement independent storage paths. The SQL parser is not implemented.
 
 ## Modules
 
-- **Storage engine:** owns file creation/opening, the versioned header, append-only record blocks, checksums, bounded reads, `File::sync_all` durability calls, exclusive OS file locks, recovery of an incomplete tail, and writing compacted copies without replacing the source file.
+- **Storage engine:** owns file creation/opening, V1/V2 versioned headers, append-only record blocks, checksums, bounded reads, `File::sync_all` durability calls, exclusive OS file locks, version-aware transaction recovery, and compacted copies without replacing the source.
 - **Document model:** defines null, boolean, signed 64-bit integer, finite floating point, UTF-8 string, binary, array, and object values. Nested objects and arrays are ordinary values, not a SQL-only feature.
 - **Collections:** group documents and persist collection metadata. Document IDs are stable, positive 64-bit identifiers within a database.
-- **Index engine:** the first in-memory primary ID map is rebuilt by replaying the file. Single-field and unique indexes are future work.
-- **Query engine/planner:** will evaluate a language-neutral query AST and choose scans or indexes. Neither is coupled to SQL.
-- **Transactions/recovery:** the first milestone has individually framed durable operations, not multi-operation transactions. A later design will add explicit transaction boundaries and a tested recovery protocol.
+- **Index engine:** the primary ID map and V2 single-field/unique secondary indexes are rebuilt from committed state on replay. Compound and text indexes are future work.
+- **Query engine/planner:** evaluates a typed native filter AST, chooses ID/index lookups or scans, and exposes a basic explain plan. It is independent of SQL.
+- **Transactions/recovery:** V2 mutations are grouped under begin/commit markers in the existing append log. Recovery applies complete committed batches and discards an uncommitted tail. No separate WAL or MVCC is implemented.
 - **SQL interface:** a future adapter for a documented subset. It maps SQL null, missing fields, nested paths, arrays, and flexible schemas onto document/query semantics described in `query-engine.md`.
 - **Server/driver:** a later transport boundary around the same engine. No cluster, replication, or wire-protocol compatibility is in scope.
 
@@ -71,4 +73,4 @@ Rust's exclusive handle requires mutable access for writes, serializing mutation
 
 Every persisted length is checked before allocation. The decoder limits record size, document size, nesting depth, collection-name size, field-name size, and element counts. UTF-8 decoding is strict. Header and record CRC32C checks detect accidental corruption; they are not authentication and do not protect against malicious modification. Invalid complete records fail open with a controlled error. Only an incomplete final record is recoverable, and its discarded byte count is exposed to the caller.
 
-The engine never derives file paths from collection names or document values. The database path is supplied by the application. There is no encryption or authentication in Phase 0.
+The engine never derives file paths from collection names or document values. The database path is supplied by the application. There is no encryption or authentication in Phase 1.

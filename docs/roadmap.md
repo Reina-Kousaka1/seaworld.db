@@ -19,13 +19,24 @@ SeaWorld DB is versioned as `0.0.x` while the file format, recovery, and API are
 - [x] Remove the Java engine, Java tests, and transitional Java CI after the Rust compatibility gate passed.
 - [x] Add a safe compacted-copy writer that preserves the source and never overwrites its destination.
 
+## Phase 1: transactions, indexes, and native query
+
+- [x] Keep V1 byte-compatible while making new files use a distinct V2 header.
+- [x] Group V2 mutations in transactions with begin and commit markers, read-your-writes, rollback, bounded operation count and size, and replay of committed transactions only.
+- [x] Recover an interrupted transaction by truncating from its begin record; reject complete checksum or semantic corruption.
+- [x] Add process-kill coverage before, during, and after commit, and interrupt recovery to verify repeatability.
+- [x] Persist single-field and unique index definitions; rebuild entries from committed documents on open.
+- [x] Add a typed native query AST, bounded filters/results, primary/secondary/full-scan planning, explain, sorting, and deterministic results.
+- [x] Add non-overwriting compaction in V2 and explicit V1-to-V2 copy migration while preserving UUIDs, live IDs, indexes, and ID high-water state.
+- [x] Document the implemented transaction, index, query, format, and security limits without claiming full ACID or SQL support.
+
 ## Next engine wave
 
-1. Add single-field and unique indexes only after query scan semantics are stable.
-2. Specify transaction boundaries, rollback, and isolation before implementing multi-operation transactions.
-3. Define a version migration tool and keep golden format fixtures before format stability.
-4. Add a language-neutral query AST and native query API; only then add a small SQL parser adapter.
-5. Measure reproducible benchmarks after correctness and crash recovery are established.
+1. Fuzz malformed headers, record streams, transaction state machines, and nested document decoders.
+2. Design page/block allocation and a migration path before adding fixed-size page storage or persistent tree indexes.
+3. Add transaction isolation only with an explicit reader/writer concurrency model and its own recovery tests.
+4. Specify and implement a narrow SQL parser adapter over the existing native query AST; keep SQL and native execution on one engine.
+5. Add storage-format golden fixtures for V2 and reproducible benchmarks after correctness and crash recovery are established.
 
 ## Explicitly out of scope
 

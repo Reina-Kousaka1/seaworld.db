@@ -1,17 +1,26 @@
 //! Experimental embedded SeaWorld DB engine.
 //!
 //! The public API and the planned SQL adapter share one document-native engine. The
-//! current implementation persists a versioned append-only SeaWorld v1 file.
+//! V1 files remain compatible; new databases use V2 transaction records.
 
 mod codec;
 mod document;
 mod error;
 mod format;
+mod index;
+mod query;
 mod storage;
 
 pub use document::{Document, MAX_DOCUMENT_BYTES, Value};
 pub use error::{Error, Result};
-pub use storage::{Database, MAX_COLLECTIONS, MAX_DATABASE_BYTES, MAX_DOCUMENTS, RecoveryReport};
+pub use index::{FieldPath, IndexId, MAX_FIELD_PATH_DEPTH, MAX_INDEXES};
+pub use query::{
+    CompareOp, Filter, MAX_FILTER_DEPTH, MAX_FILTER_NODES, MAX_QUERY_RESULTS, Query, QueryPlan,
+    QueryRow, SortDirection,
+};
+pub use storage::{
+    Database, MAX_COLLECTIONS, MAX_DATABASE_BYTES, MAX_DOCUMENTS, RecoveryReport, Transaction,
+};
 
 /// A stable, positive identifier assigned to a document within a database.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

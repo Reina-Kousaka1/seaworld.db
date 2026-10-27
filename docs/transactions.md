@@ -1,28 +1,31 @@
 # Transactions and recovery
 
-## Current guarantees
+## V1 compatibility and V2 selection
 
-The Rust engine is append-only. Each mutation is represented by one checksummed operation block, appended in sequence, and followed by `File::sync_all()`. The in-memory state changes only after that call succeeds. On reopen, verified operation blocks are replayed to rebuild collections and the primary-ID map. Subprocess tests terminate a writer at controlled append and sync points; these tests exercise process-crash recovery, not machine power-loss behavior.
+V1 remains byte-for-byte unchanged. The reader continues to replay its four operation records, and a V1 handle keeps the original single-operation CRUD behavior. `begin_transaction` and secondary-index creation return an explicit upgrade-required error for V1 files. `write_v2_compacted_copy` is the non-destructive migration path: it writes the current logical state into a new V2 file and leaves the open V1 source untouched. New databases use format V2; `create_v1` remains available for compatibility tooling.
 
-An incomplete final block is discarded with an explicit recovery report. A complete block with invalid checksum or invalid semantics fails open. A `sync_all` failure has an ambiguous outcome: a complete block may exist even though the caller received an error. Callers must close and reopen after an append error before retrying. The current handle rejects further operations after such an error.
+V2 uses the existing append-only file as its transaction log. It does not add a second WAL. The versioned header distinguishes the record grammar, so a V1 reader never encounters V2 transaction markers in a file labeled V1.
 
-## Not provided yet
+## Commit protocol
 
-The first version does not provide multi-operation transactions, rollback, snapshot isolation, serializable isolation, MVCC, concurrent writers, checkpoints, or a separate WAL. It does not claim full ACID. A single operation block is a replay unit, not a complete transaction protocol. Compacted-copy creation writes a second file and leaves the active source untouched; it is not a transaction checkpoint or an in-place log replacement.
+The V2 log writes one contiguous transaction batch:
 
-The append-only record stream is the primary storage log, so it serves as a simple journal. Future page-based storage should use a real WAL or another design with equivalent write-ahead ordering, commit markers, checksummed records, checkpointing, and bounded recovery.
+1. `TX_BEGIN(transaction_id)`;
+2. zero or more checksummed mutation records tagged with that ID;
+3. `TX_COMMIT(transaction_id)` as the final record.
 
-## Planned transaction design questions
+The engine writes the complete batch, synchronizes the file with `File::sync_all()`, then publishes the staged changes to the in-memory state and returns success. The commit marker is the recovery decision point; the sync is the API's success boundary. A sync error is outcome-ambiguous, so the handle fails closed and must be reopened. A complete marker may replay even if the caller observed an error.
 
-Before claiming transaction guarantees, specify and test:
+`Transaction` holds the database's exclusive mutable borrow. Its own reads see staged changes; no other handle can write the file, and ordinary reads through the borrowed `Database` are unavailable until commit or rollback. There is no MVCC or concurrent reader mode. Rollback discards its in-memory operation list and writes nothing. IDs returned by an uncommitted insert are provisional and can be reused after rollback; only committed IDs are durable.
 
-1. transaction IDs and begin/commit/abort markers;
-2. which mutations are durable before a commit marker;
-3. rollback behavior in memory and on disk;
-4. isolation and lock ownership;
-5. recovery of incomplete and committed transactions;
-6. idempotent repeated recovery;
-7. force ordering and directory-entry durability for create/rename/checkpoint operations;
-8. crash-injection points around write, force, commit, checkpoint, and reopen.
+Transaction IDs are positive, monotonically allocated by committed transactions and persisted in log order. They are internal and are not API-visible. A rolled-back transaction writes nothing, so the next transaction may reuse its provisional ID. Overflow is an error. The log retains only the current pending transaction during replay; V2 bounds transactions to 10,000 operations and 64 MiB of encoded operation data.
 
-The current subprocess harness covers process exit before append, during a partial block, after a full write before sync, and after sync before the operation returns. It does not simulate power loss, storage-controller cache loss, or all filesystem failure modes.
+## Recovery state machine
+
+Replay applies only complete committed transactions. It validates transaction ID ordering, begin/operation/commit ordering, each record sequence and checksum, and operation semantics. A valid but uncommitted transaction at EOF is discarded from its begin offset. A torn final record also discards the whole containing transaction. Recovery reports all discarded bytes and syncs the truncation. A complete record with a bad checksum or invalid transaction state fails open; recovery never skips it. Reopening after recovery is idempotent.
+
+The V2 process crash harness covers before begin, after begin, a partial first operation, between operations, after the last operation, a partial commit marker, after commit write before sync, after sync, and interruption during recovery. Process-kill tests do not simulate power loss or device-cache loss.
+
+## Durability limits
+
+`commit()` reports success only after `sync_all()` succeeds. That asks the operating system to synchronize file contents and metadata; filesystem, storage hardware, and OS behavior still determine power-loss durability. Linux and Windows CI verify process-level behavior, not power-failure guarantees. No full ACID or production durability claim is made.

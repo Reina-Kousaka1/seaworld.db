@@ -6,7 +6,10 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use seaworld_db::{Database, Document, DocumentId, Error, Value};
+use seaworld_db::{
+    CompareOp, Database, Document, DocumentId, Error, FieldPath, Filter, Query, QueryPlan,
+    SortDirection, Value,
+};
 
 const JAVA_V1_FIXTURE: &[u8] = include_bytes!("fixtures/java-v1-basic.fixture");
 static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(1);
@@ -52,6 +55,14 @@ fn sample_document() -> Document {
         ),
         ("username".into(), Value::String("Charlotte".into())),
     ]))
+}
+
+fn profile_document(career: Option<&str>, level: i64) -> Document {
+    let mut profile = BTreeMap::from([("level".into(), Value::Integer(level))]);
+    if let Some(career) = career {
+        profile.insert("career".into(), Value::String(career.into()));
+    }
+    Document::new(BTreeMap::from([("profile".into(), Value::Object(profile))]))
 }
 
 fn append_record(path: &PathBuf, kind: u8, sequence: i64, payload: &[u8]) {
@@ -105,6 +116,7 @@ fn create_database_writes_a_valid_64_byte_header() {
     assert_eq!(fs::metadata(&temp.path).unwrap().len(), 64);
     assert_eq!(&fs::read(&temp.path).unwrap()[..8], b"SWDB\r\n\x1a\n");
     assert_ne!(database_id, [0; 16]);
+    assert_eq!(fs::read(&temp.path).unwrap()[8..10], 2_u16.to_be_bytes());
 }
 
 #[test]
@@ -226,7 +238,7 @@ fn java_v1_fixture_opens_in_rust() {
 #[test]
 fn rust_records_are_byte_compatible_with_the_java_v1_fixture() {
     let temp = TempDatabase::new();
-    let mut database = Database::create(&temp.path).unwrap();
+    let mut database = Database::create_v1(&temp.path).unwrap();
     database.create_collection("users").unwrap();
     database
         .insert_with_id("users", DocumentId::new(42).unwrap(), sample_document())
@@ -234,6 +246,337 @@ fn rust_records_are_byte_compatible_with_the_java_v1_fixture() {
     database.close().unwrap();
     let rust_file = fs::read(&temp.path).unwrap();
     assert_eq!(&rust_file[64..], &JAVA_V1_FIXTURE[64..]);
+}
+
+#[test]
+fn v1_remains_writable_and_upgrades_only_to_a_new_v2_file() {
+    let source = TempDatabase::new();
+    let target = TempDatabase::new();
+    let mut database = Database::create_v1(&source.path).unwrap();
+    assert_eq!(database.format_version(), 1);
+    database.create_collection("users").unwrap();
+    let removed_id = DocumentId::new(99).unwrap();
+    database
+        .insert_with_id("users", removed_id, sample_document())
+        .unwrap();
+    assert!(database.delete("users", removed_id).unwrap());
+    assert!(matches!(
+        database.begin_transaction(),
+        Err(Error::UpgradeRequired(_))
+    ));
+    assert!(matches!(
+        database.create_index("users", "username"),
+        Err(Error::UpgradeRequired(_))
+    ));
+
+    let original_id = database.database_id();
+    database.write_v2_compacted_copy(&target.path).unwrap();
+    assert_eq!(
+        &fs::read(&source.path).unwrap()[8..10],
+        &1_u16.to_be_bytes()
+    );
+    database.close().unwrap();
+
+    let mut upgraded = Database::open(&target.path).unwrap();
+    assert_eq!(upgraded.format_version(), 2);
+    assert_eq!(upgraded.database_id(), original_id);
+    let next_id = upgraded.insert("users", Document::empty()).unwrap();
+    assert_eq!(next_id, DocumentId::new(100).unwrap());
+}
+
+#[test]
+fn v2_transaction_commits_multiple_collections_and_reads_its_own_writes() {
+    let temp = TempDatabase::new();
+    let mut database = Database::create(&temp.path).unwrap();
+    let (user_id, inventory_id) = {
+        let mut transaction = database.begin_transaction().unwrap();
+        transaction.create_collection("users").unwrap();
+        transaction.create_collection("inventory").unwrap();
+        let user_id = transaction.insert("users", sample_document()).unwrap();
+        let updated = sample_document().with("credits", Value::Integer(2_000));
+        assert!(
+            transaction
+                .update("users", user_id, updated.clone())
+                .unwrap()
+        );
+        assert_eq!(transaction.get("users", user_id).unwrap(), Some(&updated));
+        let inventory_id = transaction.insert("inventory", Document::empty()).unwrap();
+        assert!(transaction.delete("inventory", inventory_id).unwrap());
+        assert_eq!(transaction.get("inventory", inventory_id).unwrap(), None);
+        transaction.commit().unwrap();
+        (user_id, inventory_id)
+    };
+    assert_eq!(
+        database.get("users", user_id).unwrap(),
+        Some(&sample_document().with("credits", Value::Integer(2_000)))
+    );
+    assert_eq!(database.get("inventory", inventory_id).unwrap(), None);
+    database.close().unwrap();
+
+    let database = Database::open(&temp.path).unwrap();
+    assert_eq!(
+        database.get("users", user_id).unwrap(),
+        Some(&sample_document().with("credits", Value::Integer(2_000)))
+    );
+    assert!(database.document_ids("inventory").unwrap().is_empty());
+}
+
+#[test]
+fn rollback_discards_staged_state_and_reuses_provisional_ids() {
+    let temp = TempDatabase::new();
+    let mut database = Database::create(&temp.path).unwrap();
+    {
+        let mut transaction = database.begin_transaction().unwrap();
+        transaction.create_collection("users").unwrap();
+        let provisional = transaction.insert("users", Document::empty()).unwrap();
+        assert_eq!(provisional, DocumentId::new(1).unwrap());
+        transaction.rollback();
+    }
+    assert!(database.collection_names().unwrap().is_empty());
+    let mut transaction = database.begin_transaction().unwrap();
+    transaction.create_collection("users").unwrap();
+    assert_eq!(
+        transaction.insert("users", Document::empty()).unwrap(),
+        DocumentId::new(1).unwrap()
+    );
+    transaction.commit().unwrap();
+}
+
+#[test]
+fn secondary_and_unique_indexes_persist_and_enforce_constraints() {
+    let temp = TempDatabase::new();
+    let mut database = Database::create(&temp.path).unwrap();
+    database.create_collection("users").unwrap();
+    let ballet = database
+        .insert("users", profile_document(Some("ballet"), 17))
+        .unwrap();
+    let pop = database
+        .insert("users", profile_document(Some("pop"), 9))
+        .unwrap();
+    let missing = database
+        .insert("users", profile_document(None, 12))
+        .unwrap();
+    let index = database
+        .create_unique_index("users", "profile.career")
+        .unwrap();
+    assert!(index.value() > 0);
+    assert!(matches!(
+        database.insert("users", profile_document(Some("ballet"), 20)),
+        Err(Error::ConstraintViolation(_))
+    ));
+
+    let query = Query::new(
+        "users",
+        Filter::Compare {
+            path: FieldPath::parse("profile.career").unwrap(),
+            op: CompareOp::Eq,
+            value: Value::String("ballet".into()),
+        },
+    );
+    assert!(matches!(
+        database.explain(&query).unwrap(),
+        QueryPlan::SecondaryIndexLookup { .. }
+    ));
+    let rows = database.execute(&query).unwrap();
+    assert_eq!(rows.iter().map(|row| row.id).collect::<Vec<_>>(), [ballet]);
+    assert!(matches!(
+        database.update("users", pop, profile_document(Some("ballet"), 9)),
+        Err(Error::ConstraintViolation(_))
+    ));
+    assert!(
+        database
+            .update("users", pop, profile_document(Some("jazz"), 9))
+            .unwrap()
+    );
+
+    database.close().unwrap();
+    let database = Database::open(&temp.path).unwrap();
+    assert!(matches!(
+        database.explain(&query).unwrap(),
+        QueryPlan::SecondaryIndexLookup { .. }
+    ));
+    assert_eq!(database.execute(&query).unwrap()[0].id, ballet);
+    let jazz_query = Query::new(
+        "users",
+        Filter::Compare {
+            path: FieldPath::parse("profile.career").unwrap(),
+            op: CompareOp::Eq,
+            value: Value::String("jazz".into()),
+        },
+    );
+    assert_eq!(database.execute(&jazz_query).unwrap()[0].id, pop);
+    assert_eq!(
+        database.get("users", missing).unwrap(),
+        Some(&profile_document(None, 12))
+    );
+}
+
+#[test]
+fn indexed_and_full_scan_query_results_match() {
+    let indexed = TempDatabase::new();
+    let scanned = TempDatabase::new();
+    let mut indexed_db = Database::create(&indexed.path).unwrap();
+    let mut scanned_db = Database::create(&scanned.path).unwrap();
+    indexed_db.create_collection("users").unwrap();
+    scanned_db.create_collection("users").unwrap();
+    let documents = [
+        (10, profile_document(Some("ballet"), 17)),
+        (11, profile_document(Some("pop"), 12)),
+        (12, profile_document(None, 21)),
+        (13, profile_document(Some("ballet"), 21)),
+    ];
+    for (id, document) in &documents {
+        indexed_db
+            .insert_with_id("users", DocumentId::new(*id).unwrap(), document.clone())
+            .unwrap();
+        scanned_db
+            .insert_with_id("users", DocumentId::new(*id).unwrap(), document.clone())
+            .unwrap();
+    }
+    indexed_db.create_index("users", "profile.career").unwrap();
+    let query = Query::new(
+        "users",
+        Filter::And(vec![
+            Filter::Compare {
+                path: FieldPath::parse("profile.career").unwrap(),
+                op: CompareOp::Eq,
+                value: Value::String("ballet".into()),
+            },
+            Filter::Compare {
+                path: FieldPath::parse("profile.level").unwrap(),
+                op: CompareOp::Gte,
+                value: Value::Integer(17),
+            },
+        ]),
+    );
+    let indexed_rows = indexed_db
+        .execute(&query)
+        .unwrap()
+        .into_iter()
+        .map(|row| (row.id, row.document))
+        .collect::<Vec<_>>();
+    let scan_rows = scanned_db
+        .execute(&query)
+        .unwrap()
+        .into_iter()
+        .map(|row| (row.id, row.document))
+        .collect::<Vec<_>>();
+    assert_eq!(indexed_rows, scan_rows);
+    assert_eq!(indexed_rows.len(), 2);
+}
+
+#[test]
+fn unique_indexes_distinguish_missing_from_explicit_null() {
+    let temp = TempDatabase::new();
+    let mut database = Database::create(&temp.path).unwrap();
+    database.create_collection("users").unwrap();
+    database.insert("users", Document::empty()).unwrap();
+    database.insert("users", Document::empty()).unwrap();
+    database
+        .insert(
+            "users",
+            Document::new(BTreeMap::from([("nickname".into(), Value::Null)])),
+        )
+        .unwrap();
+    database.create_unique_index("users", "nickname").unwrap();
+    assert!(matches!(
+        database.insert(
+            "users",
+            Document::new(BTreeMap::from([("nickname".into(), Value::Null)]))
+        ),
+        Err(Error::ConstraintViolation(_))
+    ));
+    let ordered_null = Query::new(
+        "users",
+        Filter::Compare {
+            path: FieldPath::parse("nickname").unwrap(),
+            op: CompareOp::Gte,
+            value: Value::Null,
+        },
+    );
+    assert!(database.execute(&ordered_null).unwrap().is_empty());
+}
+
+#[test]
+fn query_ast_supports_nested_comparisons_boolean_logic_sort_and_bounds() {
+    let temp = TempDatabase::new();
+    let mut database = Database::create(&temp.path).unwrap();
+    database.create_collection("users").unwrap();
+    let first = database
+        .insert("users", profile_document(Some("ballet"), 17))
+        .unwrap();
+    let second = database
+        .insert("users", profile_document(Some("ballet"), 21))
+        .unwrap();
+    let missing = database
+        .insert("users", profile_document(None, 21))
+        .unwrap();
+    let filter = Filter::And(vec![
+        Filter::Compare {
+            path: FieldPath::parse("profile.level").unwrap(),
+            op: CompareOp::Gte,
+            value: Value::Integer(17),
+        },
+        Filter::Or(vec![
+            Filter::Compare {
+                path: FieldPath::parse("profile.career").unwrap(),
+                op: CompareOp::Eq,
+                value: Value::String("ballet".into()),
+            },
+            Filter::Not(Box::new(Filter::Exists {
+                path: FieldPath::parse("profile.career").unwrap(),
+                exists: true,
+            })),
+        ]),
+    ]);
+    let query = Query::new("users", filter)
+        .sort_by(
+            FieldPath::parse("profile.level").unwrap(),
+            SortDirection::Ascending,
+        )
+        .offset(1)
+        .limit(1);
+    let rows = database.execute(&query).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].id, second);
+    assert_ne!(rows[0].id, first);
+    assert_ne!(rows[0].id, missing);
+
+    let missing_query = Query::new(
+        "users",
+        Filter::Compare {
+            path: FieldPath::parse("profile.career").unwrap(),
+            op: CompareOp::Ne,
+            value: Value::String("ballet".into()),
+        },
+    );
+    assert!(
+        database
+            .execute(&missing_query)
+            .unwrap()
+            .iter()
+            .any(|row| row.id == missing)
+    );
+}
+
+#[test]
+fn query_value_limits_are_checked_before_evaluation() {
+    let temp = TempDatabase::new();
+    let mut database = Database::create(&temp.path).unwrap();
+    database.create_collection("users").unwrap();
+    let mut nested = Value::Null;
+    for _ in 0..65 {
+        nested = Value::Array(vec![nested]);
+    }
+    let query = Query::new(
+        "users",
+        Filter::Compare {
+            path: FieldPath::parse("value").unwrap(),
+            op: CompareOp::Eq,
+            value: nested,
+        },
+    );
+    assert!(matches!(database.execute(&query), Err(Error::Limit(_))));
 }
 
 #[test]
@@ -315,7 +658,7 @@ fn duplicate_document_ids_are_rejected_by_the_api() {
 #[test]
 fn duplicate_document_ids_in_a_file_are_rejected() {
     let temp = TempDatabase::new();
-    let mut database = Database::create(&temp.path).unwrap();
+    let mut database = Database::create_v1(&temp.path).unwrap();
     database.create_collection("users").unwrap();
     database.create_collection("archive").unwrap();
     database
@@ -371,7 +714,7 @@ fn complete_record_checksum_mismatch_is_rejected() {
 #[test]
 fn invalid_utf8_in_document_field_is_rejected() {
     let temp = TempDatabase::new();
-    Database::create(&temp.path).unwrap().close().unwrap();
+    Database::create_v1(&temp.path).unwrap().close().unwrap();
     let mut collection_payload = 1_i64.to_be_bytes().to_vec();
     collection_payload.extend_from_slice(&5_i32.to_be_bytes());
     collection_payload.extend_from_slice(b"users");
@@ -495,10 +838,11 @@ fn compacted_copy_preserves_live_data_and_does_not_replace_the_source() {
     }
     let deleted_id = database.insert("users", Document::empty()).unwrap();
     assert!(database.delete("users", deleted_id).unwrap());
+    let database_id = database.database_id();
+    database.create_unique_index("users", "username").unwrap();
     database.close().unwrap();
     let source_bytes = fs::read(&source.path).unwrap();
     let database = Database::open(&source.path).unwrap();
-    let database_id = database.database_id();
 
     database.write_compacted_copy(&target.path).unwrap();
 
@@ -512,6 +856,19 @@ fn compacted_copy_preserves_live_data_and_does_not_replace_the_source() {
         compacted.get("users", id).unwrap(),
         Some(&sample_document().with("credits", Value::Integer(4_000)))
     );
+    let username_query = Query::new(
+        "users",
+        Filter::Compare {
+            path: FieldPath::parse("username").unwrap(),
+            op: CompareOp::Eq,
+            value: Value::String("Charlotte".into()),
+        },
+    );
+    assert!(matches!(
+        compacted.explain(&username_query).unwrap(),
+        QueryPlan::SecondaryIndexLookup { .. }
+    ));
+    assert_eq!(compacted.execute(&username_query).unwrap()[0].id, id);
 }
 
 #[test]

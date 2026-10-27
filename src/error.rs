@@ -12,6 +12,11 @@ pub enum Error {
     Limit(String),
     NotFound(String),
     Duplicate(String),
+    UpgradeRequired(String),
+    ConstraintViolation(String),
+    UnsupportedIndexValue(String),
+    TransactionState(String),
+    Query(String),
 }
 
 /// Result type used by the SeaWorld DB API.
@@ -29,6 +34,15 @@ impl fmt::Display for Error {
             Self::Limit(message) => write!(formatter, "database limit exceeded: {message}"),
             Self::NotFound(message) => write!(formatter, "not found: {message}"),
             Self::Duplicate(message) => write!(formatter, "duplicate: {message}"),
+            Self::UpgradeRequired(message) => write!(formatter, "upgrade required: {message}"),
+            Self::ConstraintViolation(message) => {
+                write!(formatter, "constraint violation: {message}")
+            }
+            Self::UnsupportedIndexValue(message) => {
+                write!(formatter, "unsupported index value: {message}")
+            }
+            Self::TransactionState(message) => write!(formatter, "transaction state: {message}"),
+            Self::Query(message) => write!(formatter, "query error: {message}"),
         }
     }
 }

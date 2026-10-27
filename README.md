@@ -4,19 +4,19 @@
 
 SeaWorld DB is a standalone project. It is not part of Tyvera, has no Tyvera runtime dependency, and is intended to serve applications written in Java, Python, JavaScript/TypeScript, Tyvera, and other languages through future connectors.
 
-The engine is being built in Rust around its own document model, query representation, index and transaction layers, and `*.seaworld.db` file format. SQL is planned as an adapter over the same query engine. The project does not wrap or forward operations to SQLite, PostgreSQL, MongoDB, H2, or Apache Derby, and it copies no code from those projects.
+The engine is being built in Rust around its own document model, query representation, index and transaction layers, and `*.seaworld.db` file format. SQL is planned as an adapter over the same query engine; no SQL parser or SQL execution layer exists yet. The project does not wrap or forward operations to SQLite, PostgreSQL, MongoDB, H2, or Apache Derby, and it copies no code from those projects.
 
 ## Status
 
 Current development version: `0.0.1-dev`.
 
-The initial milestone is a small embedded engine that writes its own versioned database file, persists collections and documents, and reads them after close and reopen. Rust reads and writes the version 1 format; a checked-in fixture produced by the former Java implementation and a byte comparison protect compatibility with the original format. The Java engine and its test suite were removed after the Rust CI compatibility gate passed. See [the roadmap](docs/roadmap.md) for implemented and planned work.
+The Phase 0 engine milestone is complete. Rust continues to read and write the original V1 file format, protected by a Java-produced fixture and byte comparison. New databases use V2, which adds single-writer multi-operation transactions with commit-marker recovery, persistent single-field and unique indexes, a typed native query AST, and non-overwriting compaction/migration to V2. The Java engine and test suite were removed after the Rust compatibility gate passed. See [the roadmap](docs/roadmap.md) for implemented and planned work.
 
-SeaWorld DB does not claim production readiness, full ACID compliance, a complete SQL implementation, distribution, or production security. Crash recovery and durability guarantees are limited to the documented behavior and tested environments.
+SeaWorld DB does not claim production readiness, full ACID compliance, concurrent readers or MVCC, a complete SQL implementation, distribution, or production security. Transactions use one exclusive writer handle and the append log as their recovery record; recovery and durability guarantees are limited to the documented behavior and tested environments.
 
 ## Architecture
 
-Applications will use either a native SeaWorld API or a SQL compatibility layer. Both will translate into the same internal query representation and document engine. Storage details and the versioned file format are described in [architecture](docs/architecture.md) and [storage format](docs/storage-format.md).
+Applications can use the native typed query API today. A future SQL compatibility layer will translate into the same internal query representation and document engine. Storage details and the versioned file formats are described in [architecture](docs/architecture.md) and [storage format](docs/storage-format.md).
 
 ## Build
 

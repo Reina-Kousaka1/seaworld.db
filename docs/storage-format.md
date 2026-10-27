@@ -1,4 +1,4 @@
-# Storage format: version 1
+# Storage formats: versions 1 and 2
 
 This document describes the first SeaWorld file format. It is a custom format, not a serialization dump of Java objects. Integer widths, byte order, lengths, tags, and checksums are encoded explicitly. A version change or incompatible feature requires a version bump or a documented feature flag.
 
@@ -40,19 +40,29 @@ All integers in the file are big-endian. The total block length is limited to 17
 
 The `block size` field establishes a storage sizing unit for this early format. Version 1 has no page allocator, page directory, B-tree, or fixed-page layout; records may span the nominal block boundary. A later page-based format will need a versioned migration or a new file format rather than silently reinterpreting version 1.
 
+## Version 2 transaction records
+
+V2 keeps the same 64-byte header layout but stores version `2` at offset 8. V1 remains readable and writable with its original record grammar. New databases use V2. V2 records never appear under a V1 header.
+
+V2 reuses record kinds 1–4 for collection and document mutations, but each mutation payload starts with its transaction ID. Kind 5 is `TX_BEGIN(transaction_id)`, kind 6 is `TX_COMMIT(transaction_id)`, kind 7 persists an index definition, and kind 8 stores the next document-ID watermark in a compacted snapshot. An index-definition payload contains the positive index ID, positive collection ID, a one-byte unique flag, a positive segment count, then length-prefixed UTF-8 path segments. The watermark contains the next positive document ID and a one-byte exhausted flag. Every record retains the V1 prefix, increasing sequence, and CRC32C framing. A V2 transaction is one contiguous batch with one begin marker, bounded mutation records, and one final commit marker. Index definitions and watermarks are standalone records outside transactions.
+
+On recovery, only a complete, semantically valid transaction with a matching commit marker is applied. An uncommitted suffix is truncated from its begin marker; a partial record inside that suffix discards the entire transaction. A complete checksum failure or invalid transaction sequence is a corruption error, not a recoverable tail. V2 bounds one transaction to 10,000 operations and 64 MiB of encoded operation payloads. Index definitions are durable metadata; entries are rebuilt from committed documents.
+
+`Database::create` writes V2. `Database::create_v1` is an explicit compatibility path. Opening V1 preserves its format and single-operation CRUD semantics; transaction and index APIs require an explicit V2 compacted copy. The original V1 fixture remains the compatibility oracle.
+
 ## Checksums and recovery
 
 CRC32C detects accidental damage to the header and each complete record. It is not a cryptographic integrity mechanism. A complete record with a checksum mismatch, an invalid sequence, or invalid operation semantics fails open and is never silently skipped.
 
 If the final block prefix or declared block is cut off by end-of-file, open truncates only that incomplete tail to the last verified record boundary and calls Rust `File::sync_all()`. The returned recovery report exposes the number of discarded bytes. A truncated header, a malformed complete prefix, or a complete block with bad checksum is an error. Data in the unfinished final operation may be lost; earlier verified records remain readable. Repeating recovery on the resulting file should discard zero bytes.
 
-Each successful mutation appends one complete operation block and calls `File::sync_all()` before updating the in-memory view. This is not a multi-operation transaction. If a process dies after a complete record reaches durable storage but before the caller receives success, the operation may be present after reopen. Rust's `sync_all` asks the OS to synchronize file content and metadata, corresponding to the Java reference's `FileChannel.force(true)` at the file level. On Unix, creation also synchronizes the parent directory; the portable Rust standard library has no directory-sync API on Windows. Filesystem, device, and OS guarantees still need platform-specific testing; process-kill tests do not simulate power loss.
+V1 mutations append one operation block and call `File::sync_all()` before updating the in-memory view. V2 commits append a contiguous begin/mutation/commit batch and synchronize it before updating memory. If a process dies after a complete V2 commit marker reaches the file but before the caller receives success, the transaction may be present after reopen. Rust's `sync_all` asks the OS to synchronize file content and metadata, corresponding to the Java reference's `FileChannel.force(true)` at the file level. On Unix, creation also synchronizes the parent directory; the portable Rust standard library has no directory-sync API on Windows. Filesystem, device, and OS guarantees still need platform-specific testing; process-kill tests do not simulate power loss.
 
-The Rust test-only `crash-test` feature enables a separate `crash_writer` process with termination points before a block write, partway through a block, after a complete write but before sync, and after sync but before returning. The feature is disabled in release builds unless explicitly requested.
+The Rust test-only `crash-test` feature enables a separate `crash_writer` process with termination points before and during V1-compatible appends, at V2 transaction boundaries, and during suffix recovery. The feature is disabled in release builds unless explicitly requested.
 
 ## Compacted copies
 
-`write_compacted_copy` creates a new version 1 file containing the existing collections and only their active documents. It preserves the database UUID and document/collection IDs, and starts a fresh record sequence at 1. The open source file remains unchanged. The engine writes and synchronizes a same-directory temporary file, then publishes it through an atomic no-overwrite hard link and synchronizes the directory where supported. The destination filesystem must support hard links. There is no in-place replacement, automatic path switch, or compaction recovery protocol yet; the caller explicitly opens the new file and decides when to retire the old one.
+`write_compacted_copy` writes a new file in the source version. For V2 sources it retains committed live documents, index definitions, and the document-ID high-water mark; for V1 sources it preserves the legacy V1 grammar. `write_v2_compacted_copy` writes V2 from either source version and is the explicit V1 migration path. Both preserve the database UUID and live collection/document IDs, and start a fresh record sequence. The open source file remains unchanged. The engine writes and synchronizes a same-directory temporary file, then publishes it through a no-overwrite hard link and synchronizes the directory where supported. The destination filesystem must support hard links. There is no in-place replacement or automatic path switch; the caller explicitly opens the new file and decides when to retire the old one.
 
 ## Format evolution
 

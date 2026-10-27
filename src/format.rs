@@ -8,16 +8,27 @@ pub(crate) const MIN_RECORD_SIZE: usize = RECORD_PREFIX_SIZE + RECORD_TRAILER_SI
 pub(crate) const MAX_RECORD_SIZE: usize = 17 * 1024 * 1024;
 pub(crate) const MAX_DATABASE_SIZE_BYTES: u64 = 128 * 1024 * 1024;
 pub(crate) const FORMAT_VERSION: u16 = 1;
+pub(crate) const TRANSACTION_FORMAT_VERSION: u16 = 2;
 pub(crate) const HEADER_MAGIC: &[u8; 8] = b"SWDB\r\n\x1a\n";
 pub(crate) const RECORD_MAGIC: &[u8; 4] = b"SWBL";
 
-pub(crate) fn encode_header(mut database_id: [u8; 16]) -> [u8; HEADER_SIZE] {
+#[derive(Clone, Copy)]
+pub(crate) struct FileHeader {
+    pub(crate) version: u16,
+    pub(crate) database_id: [u8; 16],
+}
+
+pub(crate) fn encode_header(database_id: [u8; 16]) -> [u8; HEADER_SIZE] {
+    encode_header_version(database_id, FORMAT_VERSION)
+}
+
+pub(crate) fn encode_header_version(mut database_id: [u8; 16], version: u16) -> [u8; HEADER_SIZE] {
     database_id[6] = (database_id[6] & 0x0f) | 0x40;
     database_id[8] = (database_id[8] & 0x3f) | 0x80;
 
     let mut header = [0_u8; HEADER_SIZE];
     header[..8].copy_from_slice(HEADER_MAGIC);
-    header[8..10].copy_from_slice(&FORMAT_VERSION.to_be_bytes());
+    header[8..10].copy_from_slice(&version.to_be_bytes());
     header[10..12].copy_from_slice(&(HEADER_SIZE as u16).to_be_bytes());
     header[12..16].copy_from_slice(&BLOCK_SIZE.to_be_bytes());
     header[24..40].copy_from_slice(&database_id);
@@ -26,7 +37,7 @@ pub(crate) fn encode_header(mut database_id: [u8; 16]) -> [u8; HEADER_SIZE] {
     header
 }
 
-pub(crate) fn decode_header(bytes: &[u8]) -> Result<[u8; 16]> {
+pub(crate) fn decode_header(bytes: &[u8]) -> Result<FileHeader> {
     if bytes.len() != HEADER_SIZE {
         return Err(Error::Format("header must be exactly 64 bytes".into()));
     }
@@ -34,7 +45,7 @@ pub(crate) fn decode_header(bytes: &[u8]) -> Result<[u8; 16]> {
         return Err(Error::Format("invalid SeaWorld magic bytes".into()));
     }
     let version = u16::from_be_bytes(bytes[8..10].try_into().expect("fixed header range"));
-    if version != FORMAT_VERSION {
+    if version != FORMAT_VERSION && version != TRANSACTION_FORMAT_VERSION {
         return Err(Error::Format(format!(
             "unsupported format version {version}"
         )));
@@ -67,7 +78,10 @@ pub(crate) fn decode_header(bytes: &[u8]) -> Result<[u8; 16]> {
     if stored != actual {
         return Err(Error::Integrity("header checksum mismatch".into()));
     }
-    Ok(database_id)
+    Ok(FileHeader {
+        version,
+        database_id,
+    })
 }
 
 pub(crate) fn crc32c(bytes: &[u8]) -> u32 {
@@ -94,7 +108,10 @@ mod tests {
     #[test]
     fn header_round_trips_and_checks_reserved_bytes() {
         let header = encode_header([1; 16]);
-        assert_eq!(decode_header(&header).unwrap()[..6], [1, 1, 1, 1, 1, 1]);
+        assert_eq!(
+            decode_header(&header).unwrap().database_id[..6],
+            [1, 1, 1, 1, 1, 1]
+        );
         let mut bad = header;
         bad[40] = 1;
         let checksum = crc32c(&bad[..60]);

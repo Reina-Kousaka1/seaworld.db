@@ -17,6 +17,11 @@ pub(crate) fn encode_document(document: &Document) -> Result<Vec<u8>> {
     Ok(encoder.bytes)
 }
 
+pub(crate) fn validate_value(value: &Value) -> Result<()> {
+    let mut encoder = Encoder::default();
+    encoder.value(value, 1)
+}
+
 pub(crate) fn decode_document(bytes: &[u8]) -> Result<Document> {
     if bytes.len() > MAX_DOCUMENT_BYTES {
         return Err(Error::Integrity("document exceeds the maximum size".into()));
@@ -180,6 +185,10 @@ impl<'a> Cursor<'a> {
             .ok_or_else(|| Error::Integrity(format!("truncated {label}")))?;
         self.position = end;
         Ok(value)
+    }
+
+    pub(crate) fn u8(&mut self, label: &str) -> Result<u8> {
+        Ok(self.take(1, label)?[0])
     }
 
     pub(crate) fn i32(&mut self, label: &str) -> Result<i32> {

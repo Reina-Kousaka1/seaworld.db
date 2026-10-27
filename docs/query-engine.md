@@ -1,29 +1,22 @@
-# Query engine and SQL compatibility
+# Native query engine
 
-The query engine is independent of SQL syntax. Native API calls and SQL statements will lower into one SeaWorld query representation and use the same executor and indexes.
+The typed native query API is independent of SQL syntax. Any future SQL parser must lower to these same query nodes and call the same planner and executor.
 
-An initial filter model can express paths, literal values, comparison operators, and boolean composition:
+## Paths and values
 
-```text
-Filter(
-    field = "profile.career",
-    operator = Equals,
-    value = "ballet"
-)
-```
+`FieldPath` parses dotted paths into non-empty object-key segments. It traverses objects only: arrays are treated as values and are not implicitly traversed. A missing segment differs from explicit `Value::Null`. Invalid/empty segments and excessive depth are query errors.
 
-The first implementation only has primary-ID lookup and direct document access. It does not yet parse or execute general filters.
+`Eq`/`Ne` compare only values of the same `Value` variant; mismatched types are unequal, so `Integer(5) != String("5")`. Ordered comparisons are false for missing values and incompatible types; they never coerce integers to floats or strings. Null only equals null. Float values are finite; `-0.0` and `0.0` compare equal.
 
-## Planned query representation
+The AST supports ID equality, field comparisons (`Eq`, `Ne`, `Lt`, `Lte`, `Gt`, `Gte`), `Exists`, `And`, `Or`, and `Not`. Filters are type values, not parsed strings. Depth and node counts are bounded.
 
-- `Path`: validated list of object field segments, not an unchecked SQL string
-- `Literal`: one document `Value`
-- `Compare`: equality and ordered comparisons with explicit type rules
-- `And`, `Or`, `Not`: boolean composition
-- `Projection`: selected paths or all fields
-- `Insert`, `Update`, `Delete`: collection operations over the same document representation
+## Planner and explain
 
-The planner may use a primary-ID map, a single-field index, or a collection scan. Correctness must not depend on which access path the planner selects. Index results will be checked against scan results in tests.
+The planner chooses a primary-ID lookup for an ID equality, a secondary-index lookup for an indexed equality predicate (including a usable predicate under `And`), or a full collection scan. Other boolean shapes use a scan. Every candidate from an index is checked against the complete filter. `Explain` exposes the selected plan; it is diagnostic, not a promise of cost-based optimization.
+
+Results are deterministic: absent an explicit sort, rows are in ascending document-ID order. `limit` and `offset` have explicit upper bounds. Sorting supports missing, null, boolean, integer, finite float, and string values, ordered by that type rank and then by value; unsupported Binary/Array/Object sort values return a query error. Equal sort keys always use ascending document ID as the tie-breaker, including descending sorts.
+
+Index and scan paths are compared in differential tests. A query result must not depend on whether a secondary index exists.
 
 ## SQL subset (future)
 
