@@ -697,4 +697,255 @@ impl RecordType {
             2 => Ok(Self::DocumentInsert),
             3 => Ok(Self::DocumentUpdate),
             4 => Ok(Self::DocumentDelete),
-            _ => Err(Error::Format(format!("unknown record t
+            _ => Err(Error::Format(format!("unknown record type {code}"))),
+        }
+    }
+}
+
+fn encode_record(record_type: RecordType, sequence: i64, payload: &[u8]) -> Result<Vec<u8>> {
+    let total_length = MIN_RECORD_SIZE
+        .checked_add(payload.len())
+        .ok_or_else(|| Error::Limit("record length overflow".into()))?;
+    if total_length > MAX_RECORD_SIZE {
+        return Err(Error::Limit("record exceeds the maximum block size".into()));
+    }
+    let mut block = Vec::with_capacity(total_length);
+    block.extend_from_slice(RECORD_MAGIC);
+    block.push(record_type.code());
+    block.push(0);
+    block.extend_from_slice(&0_u16.to_be_bytes());
+    block.extend_from_slice(&(total_length as i32).to_be_bytes());
+    block.extend_from_slice(&sequence.to_be_bytes());
+    block.extend_from_slice(payload);
+    let checksum = format::crc32c(&block);
+    block.extend_from_slice(&checksum.to_be_bytes());
+    Ok(block)
+}
+
+fn write_snapshot_record(
+    file: &mut File,
+    sequence: &mut i64,
+    file_size: &mut u64,
+    record_type: RecordType,
+    payload: &[u8],
+) -> Result<()> {
+    if *sequence <= 0 || *sequence == i64::MAX {
+        return Err(Error::Limit("record sequence space is exhausted".into()));
+    }
+    let block = encode_record(record_type, *sequence, payload)?;
+    let updated_size = file_size
+        .checked_add(block.len() as u64)
+        .ok_or_else(|| Error::Limit("database file length overflow".into()))?;
+    if updated_size > MAX_DATABASE_BYTES {
+        return Err(Error::Limit(
+            "compacted database exceeds the 128 MiB file limit".into(),
+        ));
+    }
+    file.write_all(&block)?;
+    *file_size = updated_size;
+    *sequence += 1;
+    Ok(())
+}
+
+fn encode_collection_create(collection_id: i64, name: &str) -> Result<Vec<u8>> {
+    let name_bytes = name.as_bytes();
+    if name_bytes.len() > COLLECTION_NAME_MAX_BYTES {
+        return Err(Error::Limit("collection name is too long".into()));
+    }
+    let length = i32::try_from(name_bytes.len())
+        .map_err(|_| Error::Limit("collection name is too long".into()))?;
+    let mut payload = Vec::with_capacity(12 + name_bytes.len());
+    payload.extend_from_slice(&collection_id.to_be_bytes());
+    payload.extend_from_slice(&length.to_be_bytes());
+    payload.extend_from_slice(name_bytes);
+    Ok(payload)
+}
+
+fn encode_document_mutation(
+    collection_id: i64,
+    document_id: DocumentId,
+    document: &Document,
+) -> Result<Vec<u8>> {
+    let encoded_document = codec::encode_document(document)?;
+    let document_length = i32::try_from(encoded_document.len())
+        .map_err(|_| Error::Limit("document is too large".into()))?;
+    let mut payload = Vec::with_capacity(20 + encoded_document.len());
+    payload.extend_from_slice(&collection_id.to_be_bytes());
+    payload.extend_from_slice(&document_id.value().to_be_bytes());
+    payload.extend_from_slice(&document_length.to_be_bytes());
+    payload.extend_from_slice(&encoded_document);
+    Ok(payload)
+}
+
+fn decode_document_mutation(input: &mut Cursor<'_>) -> Result<(i64, i64, Document)> {
+    let collection_id = input.i64("document collection identifier")?;
+    let document_id = input.i64("document identifier")?;
+    if collection_id <= 0 || document_id <= 0 {
+        return Err(Error::Integrity(
+            "document identifiers must be positive".into(),
+        ));
+    }
+    let document_length = input.i32("document length")?;
+    if document_length < 0 || document_length as usize > crate::MAX_DOCUMENT_BYTES {
+        return Err(Error::Integrity("document length is out of bounds".into()));
+    }
+    let document_bytes = input.bytes_exact(document_length as usize, "document payload")?;
+    input.finish("document record")?;
+    let document = codec::decode_document(&document_bytes)?;
+    Ok((collection_id, document_id, document))
+}
+
+fn validate_collection_name(name: &str) -> Result<()> {
+    let bytes = name.as_bytes();
+    if bytes.is_empty() || bytes.len() > 63 || !bytes[0].is_ascii_alphabetic() && bytes[0] != b'_' {
+        return Err(Error::InvalidInput(
+            "collection name must start with an ASCII letter or underscore and contain at most 63 characters".into(),
+        ));
+    }
+    if !bytes
+        .iter()
+        .all(|byte| byte.is_ascii_alphanumeric() || *byte == b'_' || *byte == b'-')
+    {
+        return Err(Error::InvalidInput(
+            "collection names accept only ASCII letters, digits, '_' and '-'".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn absolute_path(path: &Path) -> Result<PathBuf> {
+    if path.as_os_str().is_empty() {
+        return Err(Error::InvalidInput("database path cannot be empty".into()));
+    }
+    Ok(if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()?.join(path)
+    })
+}
+
+fn temporary_sibling_path(target: &Path) -> Result<PathBuf> {
+    let parent = target
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let file_name = target
+        .file_name()
+        .ok_or_else(|| Error::InvalidInput("compacted-copy path needs a file name".into()))?;
+    let mut temporary_name = file_name.to_os_string();
+    let counter = NEXT_COMPACTION_TEMP_ID.fetch_add(1, Ordering::Relaxed);
+    temporary_name.push(format!(".swdb-tmp-{}-{counter}", std::process::id()));
+    Ok(parent.join(temporary_name))
+}
+
+fn acquire_lock(file: &File) -> Result<()> {
+    match file.try_lock() {
+        Ok(()) => Ok(()),
+        Err(TryLockError::WouldBlock) => Err(Error::Locked),
+        Err(TryLockError::Error(error)) => Err(Error::Io(error)),
+    }
+}
+
+fn random_database_id() -> Result<[u8; 16]> {
+    let mut id = [0_u8; 16];
+    getrandom::fill(&mut id).map_err(Error::Randomness)?;
+    id[6] = (id[6] & 0x0f) | 0x40;
+    id[8] = (id[8] & 0x3f) | 0x80;
+    Ok(id)
+}
+
+#[cfg(unix)]
+fn sync_parent_directory(path: &Path) -> Result<()> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    File::open(parent)?.sync_all()?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn sync_parent_directory(_path: &Path) -> Result<()> {
+    // Rust's portable File API has no directory-sync operation on Windows.
+    Ok(())
+}
+
+#[cfg(feature = "crash-test")]
+fn crash_before_write() {
+    crash_pause_if("before_write");
+}
+
+#[cfg(not(feature = "crash-test"))]
+fn crash_before_write() {}
+
+#[cfg(feature = "crash-test")]
+fn crash_during_write() -> bool {
+    std::env::var("SEAWORLD_CRASH_AT").is_ok_and(|point| point == "during_write")
+}
+
+#[cfg(not(feature = "crash-test"))]
+fn crash_during_write() -> bool {
+    false
+}
+
+#[cfg(feature = "crash-test")]
+fn crash_after_write() {
+    crash_pause_if("after_write_before_sync");
+}
+
+#[cfg(not(feature = "crash-test"))]
+fn crash_after_write() {}
+
+#[cfg(feature = "crash-test")]
+fn crash_after_sync() {
+    crash_pause_if("after_sync_before_return");
+}
+
+#[cfg(not(feature = "crash-test"))]
+fn crash_after_sync() {}
+
+#[cfg(feature = "crash-test")]
+fn crash_pause_if(point: &str) {
+    if std::env::var("SEAWORLD_CRASH_AT").is_ok_and(|configured| configured == point) {
+        crash_pause(point);
+    }
+}
+
+#[cfg(feature = "crash-test")]
+fn crash_pause(point: &str) -> ! {
+    if let Some(marker) = std::env::var_os("SEAWORLD_CRASH_READY_FILE")
+        && let Err(error) = std::fs::write(marker, point.as_bytes())
+    {
+        eprintln!("could not write crash-test marker: {error}");
+        std::process::exit(87);
+    }
+    loop {
+        std::thread::sleep(std::time::Duration::from_secs(60));
+    }
+}
+
+#[cfg(not(feature = "crash-test"))]
+fn crash_pause(_point: &str) -> ! {
+    unreachable!("crash points are disabled without the crash-test feature")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn collection_validation_matches_ascii_name_grammar() {
+        assert!(validate_collection_name("users").is_ok());
+        assert!(validate_collection_name("_private-2").is_ok());
+        assert!(validate_collection_name("../users").is_err());
+        assert!(validate_collection_name("üser").is_err());
+        assert!(validate_collection_name(&"a".repeat(64)).is_err());
+    }
+
+    #[test]
+    fn record_crc_covers_prefix_and_payload() {
+        let record = encode_record(RecordType::CollectionCreate, 1, b"test").unwrap();
+        let stored = u32::from_be_bytes(record[record.len() - 4..].try_into().unwrap());
+        assert_eq!(stored, format::crc32c(&record[..record.len() - 4]));
+    }
+}
