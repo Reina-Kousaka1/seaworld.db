@@ -318,6 +318,26 @@ fn snapshot_and_fixed_reader_retain_query_results_across_writer_commits() {
             .offset(1)
             .limit(2),
         Query::new("users", Filter::Not(Box::new(Filter::Not(Box::new(equal))))),
+        Query::new(
+            "users",
+            Filter::And(vec![
+                Filter::Exists {
+                    path: FieldPath::parse("score").unwrap(),
+                    exists: true,
+                },
+                Filter::Or(vec![
+                    Filter::Compare {
+                        path: FieldPath::parse("score").unwrap(),
+                        op: CompareOp::Lt,
+                        value: Value::Integer(15),
+                    },
+                    Filter::Not(Box::new(Filter::Exists {
+                        path: FieldPath::parse("missing").unwrap(),
+                        exists: true,
+                    })),
+                ]),
+            ]),
+        ),
     ];
     let snapshot_rows = |snapshot: &Snapshot, query: &Query| {
         snapshot
@@ -380,6 +400,11 @@ fn snapshot_and_fixed_reader_retain_query_results_across_writer_commits() {
     assert!(transaction.update("users", ids[0], item(0, "a")).unwrap());
     assert!(transaction.update("users", ids[3], item(25, "d")).unwrap());
     transaction.commit().unwrap();
+    let snapshot_middle = writer.begin_read().unwrap();
+    let middle: Vec<_> = queries
+        .iter()
+        .map(|query| snapshot_rows(&snapshot_middle, query))
+        .collect();
     let mut transaction = writer.begin_transaction().unwrap();
     assert!(transaction.delete("users", ids[1]).unwrap());
     assert!(transaction.update("users", ids[2], item(12, "c")).unwrap());
@@ -403,6 +428,9 @@ fn snapshot_and_fixed_reader_retain_query_results_across_writer_commits() {
         );
         assert_eq!(reader_rows(&reader_b, query), reader_rows(&writer, query));
     }
+    for (query, expected) in queries.iter().zip(&middle) {
+        assert_eq!(&snapshot_rows(&snapshot_middle, query), expected);
+    }
     assert_ne!(before[0], snapshot_rows(&snapshot_b, &queries[0]));
     assert_ne!(before[4], snapshot_rows(&snapshot_b, &queries[4]));
     assert!(snapshot_rows(&snapshot_b, &queries[2]).is_empty());
@@ -410,6 +438,20 @@ fn snapshot_and_fixed_reader_retain_query_results_across_writer_commits() {
         snapshot_rows(&snapshot_b, &queries[2]),
         snapshot_rows(&snapshot_b, &queries[6])
     );
+    let latest: Vec<_> = queries
+        .iter()
+        .map(|query| snapshot_rows(&snapshot_b, query))
+        .collect();
+    drop(snapshot_a);
+    drop(snapshot_middle);
+    drop(snapshot_b);
+    drop(reader_a);
+    drop(reader_b);
+    writer.close().unwrap();
+    let reopened = Database::open_reader(&temp.0).unwrap();
+    for (query, expected) in queries.iter().zip(&latest) {
+        assert_eq!(&reader_rows(&reopened, query), expected);
+    }
 }
 
 #[test]
