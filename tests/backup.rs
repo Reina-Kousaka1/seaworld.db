@@ -383,8 +383,8 @@ fn interrupted_backup_never_publishes_a_partial_destination() {
         "transaction_during_first_operation",
         "compaction_before_publish",
     ]
-        .iter()
-        .enumerate()
+    .iter()
+    .enumerate()
     {
         let target = dir.path(&format!("interrupted-{index}.seaworld.db"));
         let ready = dir.path(&format!("ready-{index}"));
