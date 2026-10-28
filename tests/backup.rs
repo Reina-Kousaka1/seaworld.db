@@ -209,6 +209,24 @@ fn corrupt_backups_fail_verification_and_cannot_damage_restore_targets() {
     let mut bad_checksum = original.clone();
     *bad_checksum.last_mut().unwrap() ^= 1;
     variants.push(bad_checksum);
+    let mut bad_page = original.clone();
+    let mut offset = 64_usize;
+    let mut found_page = false;
+    while offset < bad_page.len() {
+        let length_bytes = &bad_page[offset + 8..offset + 12];
+        let length = u32::from_be_bytes(length_bytes.try_into().unwrap()) as usize;
+        if bad_page[offset + 4] == 10 && length == 4_120 {
+            bad_page[offset + 20 + 4_091] ^= 1;
+            let checksum_offset = offset + length - 4;
+            let checksum = crc32c(&bad_page[offset..checksum_offset]);
+            bad_page[checksum_offset..offset + length].copy_from_slice(&checksum.to_be_bytes());
+            found_page = true;
+            break;
+        }
+        offset += length;
+    }
+    assert!(found_page, "backup must contain a standalone index page");
+    variants.push(bad_page);
     let mut truncated = original.clone();
     truncated.pop();
     variants.push(truncated);
@@ -360,7 +378,11 @@ fn interrupted_backup_never_publishes_a_partial_destination() {
     database.close().unwrap();
     let prior_bytes = fs::read(&prior).unwrap();
 
-    for (index, point) in ["compaction_after_create", "compaction_before_publish"]
+    for (index, point) in [
+        "compaction_after_create",
+        "transaction_during_first_operation",
+        "compaction_before_publish",
+    ]
         .iter()
         .enumerate()
     {
