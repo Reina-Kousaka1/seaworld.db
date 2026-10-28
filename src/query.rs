@@ -38,6 +38,34 @@ pub enum Filter {
     Not(Box<Filter>),
 }
 
+impl Filter {
+    /// Matches a present field equal to any supplied value, without type coercion.
+    /// An empty list matches no documents. Execution validates the resulting filter.
+    pub fn in_values(path: FieldPath, values: impl IntoIterator<Item = Value>) -> Result<Self> {
+        let mut filters = Vec::new();
+        for value in values {
+            if filters.len() >= MAX_FILTER_NODES - 2 {
+                return Err(Error::Limit("query filter is too complex".into()));
+            }
+            filters.push(Self::Compare {
+                path: path.clone(),
+                op: CompareOp::Eq,
+                value,
+            });
+        }
+        if filters.is_empty() {
+            Ok(Self::Not(Box::new(Self::All)))
+        } else {
+            Ok(Self::Or(filters))
+        }
+    }
+
+    /// Matches documents not matched by `in_values`, including missing fields.
+    pub fn not_in_values(path: FieldPath, values: impl IntoIterator<Item = Value>) -> Result<Self> {
+        Ok(Self::Not(Box::new(Self::in_values(path, values)?)))
+    }
+}
+
 /// Direction for a deterministic field sort.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortDirection {

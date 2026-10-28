@@ -26,3 +26,11 @@ These limits are protective initial defaults, not a long-term resource-governanc
 Collections do not impose a global schema in the first version. A document may omit a field or store different value types in the same field across documents. Schema validation and constraints are planned as explicit metadata layered on the document model, not a reason to make SQL the storage representation.
 
 For queries, a missing field is distinct from a present field whose value is null. In SQL V0, `field = NULL` matches explicit null, while `field != value` also matches a missing field; `IS NULL` syntax is not implemented. Nested paths such as `profile.career` traverse object values only. Arrays remain document values and path traversal does not enter array elements. See [SQL V0 semantics](sql.md); SQL and native queries share the same query matcher.
+
+Native `Filter::in_values` builds an OR of exact equality predicates. Values are
+not coerced and arrays compare as complete values; this is not an array-element
+or multikey query. An empty list matches nothing. `Filter::not_in_values` negates
+that predicate, so it includes missing fields and an empty list matches all
+documents. An explicit null matches only an explicit null. The normal filter
+complexity and value limits are checked on execution, and these expressions use
+the existing planner and full-filter evaluation.

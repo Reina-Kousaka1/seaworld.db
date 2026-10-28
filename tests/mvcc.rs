@@ -50,6 +50,57 @@ fn scalar_document(value: Option<Value>) -> Document {
     })
 }
 
+#[test]
+fn membership_filters_distinguish_null_missing_and_complete_arrays() {
+    let temp = TempDatabase::new();
+    let mut database = Database::create(&temp.0).unwrap();
+    database.create_collection("items").unwrap();
+    let missing = database.insert("items", scalar_document(None)).unwrap();
+    let null = database
+        .insert("items", scalar_document(Some(Value::Null)))
+        .unwrap();
+    let number = database
+        .insert("items", scalar_document(Some(Value::Integer(1))))
+        .unwrap();
+    let array = database
+        .insert(
+            "items",
+            scalar_document(Some(Value::Array(vec![Value::Integer(1)]))),
+        )
+        .unwrap();
+    let path = FieldPath::parse("value").unwrap();
+    let ids = |filter: Filter| {
+        database
+            .execute(&Query::new("items", filter))
+            .unwrap()
+            .into_iter()
+            .map(|row| row.id)
+            .collect::<Vec<_>>()
+    };
+    let values = vec![Value::Null, Value::Integer(1)];
+    assert_eq!(
+        ids(Filter::in_values(path.clone(), values.clone()).unwrap()),
+        vec![null, number]
+    );
+    assert_eq!(
+        ids(Filter::not_in_values(path.clone(), values).unwrap()),
+        vec![missing, array]
+    );
+    assert!(ids(Filter::in_values(path.clone(), Vec::new()).unwrap()).is_empty());
+    assert_eq!(
+        ids(Filter::not_in_values(path.clone(), Vec::new()).unwrap()),
+        vec![missing, null, number, array]
+    );
+    assert_eq!(
+        ids(Filter::in_values(path.clone(), vec![Value::Array(vec![Value::Integer(1)])]).unwrap()),
+        vec![array]
+    );
+    assert!(matches!(
+        Filter::in_values(path, std::iter::repeat_n(Value::Null, 1023)),
+        Err(Error::Limit(_))
+    ));
+}
+
 fn next_seed(seed: &mut u64) -> u64 {
     *seed ^= *seed << 13;
     *seed ^= *seed >> 7;
