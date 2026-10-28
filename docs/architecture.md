@@ -54,6 +54,8 @@ Application
 
 The query engine consumes SeaWorld's own typed query representation. Native callers use that representation directly. SQL V0 has a bounded lexer/parser and lowers supported statements to the same query representation, planner, and transaction layer; it has no separate storage path.
 
+A potential future WiredTiger backend and its unresolved responsibility boundaries are assessed in [wiredtiger-assessment.md](wiredtiger-assessment.md). The current SeaWorld backend remains authoritative; no alternative backend or migration is implemented. The [V1 convergence assessment](v1-convergence.md) records the public-contract gaps and decisions still required.
+
 ## Modules
 
 - **Storage engine:** owns file creation/opening, V1/V2/V3/V4 versioned headers, append-only record blocks, bounded reads, checksums, `File::sync_all` calls, an exclusive writer sidecar lock plus shared/exclusive database-file locks, version-aware transaction recovery, and non-overwriting compacted copies.
