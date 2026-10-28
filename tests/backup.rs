@@ -8,7 +8,9 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use seaworld_db::{CompareOp, Database, Document, DocumentId, FieldPath, Filter, Query, QueryPlan, Value};
+use seaworld_db::{
+    CompareOp, Database, Document, DocumentId, FieldPath, Filter, Query, QueryPlan, Value,
+};
 
 static NEXT_DIR: AtomicU64 = AtomicU64::new(1);
 
@@ -17,7 +19,8 @@ struct TestDir(PathBuf);
 impl TestDir {
     fn new() -> Self {
         let id = NEXT_DIR.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!("seaworld-backup-{}-{id}", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("seaworld-backup-{}-{id}", std::process::id()));
         fs::create_dir(&path).unwrap();
         Self(path)
     }
@@ -53,7 +56,14 @@ fn index_metadata(database: &Database) -> Vec<(i64, String, String, bool)> {
         .indexes()
         .unwrap()
         .into_iter()
-        .map(|index| (index.id.value(), index.collection, index.path.to_string(), index.unique))
+        .map(|index| {
+            (
+                index.id.value(),
+                index.collection,
+                index.path.to_string(),
+                index.unique,
+            )
+        })
         .collect()
 }
 
@@ -65,7 +75,10 @@ fn indexed_and_scan_queries() -> (Query, Query) {
     };
     (
         Query::new("users", filter.clone()),
-        Query::new("users", Filter::Not(Box::new(Filter::Not(Box::new(filter))))),
+        Query::new(
+            "users",
+            Filter::Not(Box::new(Filter::Not(Box::new(filter)))),
+        ),
     )
 }
 
@@ -108,8 +121,14 @@ fn backup_during_staged_transaction_restores_committed_state_and_watermarks() {
     assert_eq!(backup_db.get("users", first).unwrap(), Some(&item(10, "a")));
     assert_eq!(index_metadata(&backup_db), indexes);
     let (indexed, scan) = indexed_and_scan_queries();
-    assert!(matches!(backup_db.explain(&indexed).unwrap(), QueryPlan::SecondaryIndexRangeLookup { .. }));
-    assert!(matches!(backup_db.explain(&scan).unwrap(), QueryPlan::FullScan { .. }));
+    assert!(matches!(
+        backup_db.explain(&indexed).unwrap(),
+        QueryPlan::SecondaryIndexRangeLookup { .. }
+    ));
+    assert!(matches!(
+        backup_db.explain(&scan).unwrap(),
+        QueryPlan::FullScan { .. }
+    ));
     assert_eq!(rows(&backup_db, &indexed), rows(&backup_db, &scan));
     let expected = rows(&backup_db, &Query::new("users", Filter::All));
     backup_db.close().unwrap();
@@ -121,7 +140,10 @@ fn backup_during_staged_transaction_restores_committed_state_and_watermarks() {
     let mut restored_db = Database::open(&restored).unwrap();
     assert_eq!(restored_db.database_id(), identity);
     assert_eq!(index_metadata(&restored_db), indexes);
-    assert_eq!(rows(&restored_db, &Query::new("users", Filter::All)), expected);
+    assert_eq!(
+        rows(&restored_db, &Query::new("users", Filter::All)),
+        expected
+    );
     assert_eq!(rows(&restored_db, &indexed), rows(&restored_db, &scan));
     assert!(restored_db.current_version().unwrap().value() >= version);
     let next = restored_db.insert("users", item(99, "z")).unwrap();
@@ -129,7 +151,10 @@ fn backup_during_staged_transaction_restores_committed_state_and_watermarks() {
     restored_db.write_compacted_copy(&compacted).unwrap();
     restored_db.close().unwrap();
     let compacted_db = Database::open_reader(&compacted).unwrap();
-    assert_eq!(compacted_db.get("users", next).unwrap(), Some(&item(99, "z")));
+    assert_eq!(
+        compacted_db.get("users", next).unwrap(),
+        Some(&item(99, "z"))
+    );
     compacted_db.close().unwrap();
     writer.close().unwrap();
 }
@@ -198,9 +223,15 @@ fn corrupt_backups_fail_verification_and_cannot_damage_restore_targets() {
         let destination = dir.path(&format!("restore-{index}.seaworld.db"));
         fs::write(&corrupted, bytes).unwrap();
         assert!(Database::verify_backup(&corrupted).is_err(), "case {index}");
-        assert!(Database::restore_backup(&corrupted, &destination).is_err(), "case {index}");
+        assert!(
+            Database::restore_backup(&corrupted, &destination).is_err(),
+            "case {index}"
+        );
         assert!(!destination.exists(), "case {index}");
-        assert!(Database::restore_backup(&corrupted, &existing).is_err(), "case {index}");
+        assert!(
+            Database::restore_backup(&corrupted, &existing).is_err(),
+            "case {index}"
+        );
         assert_eq!(fs::read(&existing).unwrap(), b"untouched");
         assert_eq!(fs::read(&corrupted).unwrap(), *bytes);
     }
@@ -219,7 +250,10 @@ fn java_v1_fixture_can_be_verified_and_restored_without_changing_it() {
     let restored_db = Database::open_reader(&restored).unwrap();
     assert_eq!(restored_db.format_version(), 4);
     assert_eq!(restored_db.database_id(), report.database_id);
-    assert_eq!(restored_db.document_ids("users").unwrap(), [DocumentId::new(42).unwrap()]);
+    assert_eq!(
+        restored_db.document_ids("users").unwrap(),
+        [DocumentId::new(42).unwrap()]
+    );
     assert_eq!(fs::read(&source).unwrap(), fixture);
 }
 
@@ -310,7 +344,11 @@ proptest::proptest! {
 #[cfg(feature = "crash-test")]
 #[test]
 fn interrupted_backup_never_publishes_a_partial_destination() {
-    use std::{process::Command, thread, time::{Duration, Instant}};
+    use std::{
+        process::Command,
+        thread,
+        time::{Duration, Instant},
+    };
 
     let dir = TestDir::new();
     let source = dir.path("source.seaworld.db");
@@ -322,7 +360,10 @@ fn interrupted_backup_never_publishes_a_partial_destination() {
     database.close().unwrap();
     let prior_bytes = fs::read(&prior).unwrap();
 
-    for (index, point) in ["compaction_after_create", "compaction_before_publish"].iter().enumerate() {
+    for (index, point) in ["compaction_after_create", "compaction_before_publish"]
+        .iter()
+        .enumerate()
+    {
         let target = dir.path(&format!("interrupted-{index}.seaworld.db"));
         let ready = dir.path(&format!("ready-{index}"));
         let mut child = Command::new(env!("CARGO_BIN_EXE_crash_writer"))

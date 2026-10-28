@@ -338,15 +338,39 @@ fn snapshot_and_fixed_reader_retain_query_results_across_writer_commits() {
 
     let snapshot_a = writer.begin_read().unwrap();
     let reader_a = Database::open_reader(&temp.0).unwrap();
-    assert!(matches!(reader_a.explain(&queries[0]).unwrap(), QueryPlan::FullScan { .. }));
-    assert!(matches!(reader_a.explain(&queries[1]).unwrap(), QueryPlan::PrimaryKeyLookup { .. }));
-    assert!(matches!(reader_a.explain(&queries[2]).unwrap(), QueryPlan::SecondaryIndexLookup { unique: false, .. }));
-    assert!(matches!(reader_a.explain(&queries[3]).unwrap(), QueryPlan::SecondaryIndexLookup { unique: true, .. }));
-    assert!(matches!(reader_a.explain(&queries[4]).unwrap(), QueryPlan::SecondaryIndexRangeLookup { .. }));
-    assert!(matches!(reader_a.explain(&queries[6]).unwrap(), QueryPlan::FullScan { .. }));
-    let before: Vec<_> = queries.iter().map(|query| snapshot_rows(&snapshot_a, query)).collect();
+    assert!(matches!(
+        reader_a.explain(&queries[0]).unwrap(),
+        QueryPlan::FullScan { .. }
+    ));
+    assert!(matches!(
+        reader_a.explain(&queries[1]).unwrap(),
+        QueryPlan::PrimaryKeyLookup { .. }
+    ));
+    assert!(matches!(
+        reader_a.explain(&queries[2]).unwrap(),
+        QueryPlan::SecondaryIndexLookup { unique: false, .. }
+    ));
+    assert!(matches!(
+        reader_a.explain(&queries[3]).unwrap(),
+        QueryPlan::SecondaryIndexLookup { unique: true, .. }
+    ));
+    assert!(matches!(
+        reader_a.explain(&queries[4]).unwrap(),
+        QueryPlan::SecondaryIndexRangeLookup { .. }
+    ));
+    assert!(matches!(
+        reader_a.explain(&queries[6]).unwrap(),
+        QueryPlan::FullScan { .. }
+    ));
+    let before: Vec<_> = queries
+        .iter()
+        .map(|query| snapshot_rows(&snapshot_a, query))
+        .collect();
     for (query, expected) in queries.iter().zip(&before) {
-        assert!(matches!(snapshot_a.explain(query).unwrap(), QueryPlan::FullScan { .. }));
+        assert!(matches!(
+            snapshot_a.explain(query).unwrap(),
+            QueryPlan::FullScan { .. }
+        ));
         assert_eq!(&reader_rows(&reader_a, query), expected);
     }
     assert_eq!(before[2], before[6]);
@@ -362,7 +386,9 @@ fn snapshot_and_fixed_reader_retain_query_results_across_writer_commits() {
     transaction.insert("users", item(40, "f")).unwrap();
     transaction.commit().unwrap();
     let mut transaction = writer.begin_transaction().unwrap();
-    transaction.insert("users", item(20, "rolled-back")).unwrap();
+    transaction
+        .insert("users", item(20, "rolled-back"))
+        .unwrap();
     transaction.rollback();
 
     let snapshot_b = writer.begin_read().unwrap();
@@ -371,13 +397,19 @@ fn snapshot_and_fixed_reader_retain_query_results_across_writer_commits() {
     for (query, expected) in queries.iter().zip(&before) {
         assert_eq!(&snapshot_rows(&snapshot_a, query), expected);
         assert_eq!(&reader_rows(&reader_a, query), expected);
-        assert_eq!(snapshot_rows(&snapshot_b, query), reader_rows(&reader_b, query));
+        assert_eq!(
+            snapshot_rows(&snapshot_b, query),
+            reader_rows(&reader_b, query)
+        );
         assert_eq!(reader_rows(&reader_b, query), reader_rows(&writer, query));
     }
     assert_ne!(before[0], snapshot_rows(&snapshot_b, &queries[0]));
     assert_ne!(before[4], snapshot_rows(&snapshot_b, &queries[4]));
     assert!(snapshot_rows(&snapshot_b, &queries[2]).is_empty());
-    assert_eq!(snapshot_rows(&snapshot_b, &queries[2]), snapshot_rows(&snapshot_b, &queries[6]));
+    assert_eq!(
+        snapshot_rows(&snapshot_b, &queries[2]),
+        snapshot_rows(&snapshot_b, &queries[6])
+    );
 }
 
 #[test]
