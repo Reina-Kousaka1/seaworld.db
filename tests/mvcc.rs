@@ -101,6 +101,66 @@ fn membership_filters_distinguish_null_missing_and_complete_arrays() {
     ));
 }
 
+#[test]
+fn nested_membership_matches_indexed_equalities_across_reopen() {
+    let temp = TempDatabase::new();
+    let mut database = Database::create(&temp.0).unwrap();
+    database.create_collection("items").unwrap();
+    for value in [Value::Null, Value::Integer(1), Value::Integer(2)] {
+        let profile = Value::object([("level".to_string(), value)]);
+        database
+            .insert("items", Document::empty().with("profile", profile))
+            .unwrap();
+    }
+    database.create_index("items", "profile.level").unwrap();
+    let path = FieldPath::parse("profile.level").unwrap();
+    let values = vec![Value::Null, Value::Integer(2)];
+    let membership = Query::new(
+        "items",
+        Filter::in_values(path.clone(), values.clone()).unwrap(),
+    );
+    let expected = |db: &Database| {
+        let mut ids = Vec::new();
+        for value in &values {
+            let query = Query::new(
+                "items",
+                Filter::Compare {
+                    path: path.clone(),
+                    op: CompareOp::Eq,
+                    value: value.clone(),
+                },
+            );
+            assert!(matches!(
+                db.explain(&query).unwrap(),
+                QueryPlan::SecondaryIndexLookup { .. }
+            ));
+            ids.extend(db.execute(&query).unwrap().into_iter().map(|row| row.id));
+        }
+        ids.sort_unstable();
+        ids
+    };
+    let actual = |db: &Database| {
+        db.execute(&membership)
+            .unwrap()
+            .into_iter()
+            .map(|row| row.id)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(actual(&database), expected(&database));
+    assert_eq!(
+        database
+            .begin_read()
+            .unwrap()
+            .execute(&membership)
+            .unwrap()
+            .len(),
+        2
+    );
+    database.close().unwrap();
+    let reopened = Database::open_reader(&temp.0).unwrap();
+    assert_eq!(actual(&reopened), expected(&reopened));
+}
+
 fn next_seed(seed: &mut u64) -> u64 {
     *seed ^= *seed << 13;
     *seed ^= *seed >> 7;
