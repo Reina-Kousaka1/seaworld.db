@@ -34,3 +34,15 @@ that predicate, so it includes missing fields and an empty list matches all
 documents. An explicit null matches only an explicit null. The normal filter
 complexity and value limits are checked on execution, and these expressions use
 the existing planner and full-filter evaluation.
+
+Native `Filter::ArrayContains` checks equality against direct elements of the
+array at a path. It does not flatten nested arrays or traverse arrays in paths;
+missing, null and scalar fields do not match. Nested array or object elements
+can be compared as complete values. Negation uses the ordinary `Not` semantics.
+It does not introduce multikey indexes. The planner can use a separate indexed
+conjunct and always rechecks the complete predicate.
+
+Native `Projection` returns stable IDs and a map of requested `FieldPath` values.
+Missing paths are omitted, while null is retained; arrays are returned as whole
+values and paths traverse objects only. Projection happens after filtering,
+sorting and pagination and is available on both database handles and snapshots.

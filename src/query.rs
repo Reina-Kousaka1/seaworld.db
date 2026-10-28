@@ -30,7 +30,10 @@ impl Projection {
         let fields = self
             .0
             .iter()
-            .filter_map(|path| path.get(document).map(|value| (path.clone(), value.clone())))
+            .filter_map(|path| {
+                path.get(document)
+                    .map(|value| (path.clone(), value.clone()))
+            })
             .collect();
         ProjectedRow { id, fields }
     }
@@ -68,6 +71,11 @@ pub enum Filter {
     Exists {
         path: FieldPath,
         exists: bool,
+    },
+    /// Matches a direct array element by exact value, without implicit traversal.
+    ArrayContains {
+        path: FieldPath,
+        value: Value,
     },
     And(Vec<Filter>),
     Or(Vec<Filter>),
@@ -200,7 +208,9 @@ pub(crate) fn validate_filter(filter: &Filter) -> Result<()> {
             return Err(Error::Limit("query filter is too complex".into()));
         }
         match filter {
-            Filter::Compare { value, .. } => crate::codec::validate_value(value)?,
+            Filter::Compare { value, .. } | Filter::ArrayContains { value, .. } => {
+                crate::codec::validate_value(value)?;
+            }
             Filter::And(children) | Filter::Or(children) => {
                 if children.is_empty() {
                     return Err(Error::Query(
@@ -242,6 +252,10 @@ pub(crate) fn matches(filter: &Filter, id: DocumentId, document: &Document) -> b
             },
         },
         Filter::Exists { path, exists } => path.get(document).is_some() == *exists,
+        Filter::ArrayContains { path, value } => match path.get(document) {
+            Some(Value::Array(values)) => values.iter().any(|item| equal_values(item, value)),
+            _ => false,
+        },
         Filter::And(children) => children.iter().all(|child| matches(child, id, document)),
         Filter::Or(children) => children.iter().any(|child| matches(child, id, document)),
         Filter::Not(child) => !matches(child, id, document),
