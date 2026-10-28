@@ -490,6 +490,14 @@ impl Database {
         self.write_v4_compacted_copy(target)
     }
 
+    /// Validates a backup through a fixed read-only view without repairing it.
+    pub fn verify_backup(path: impl AsRef<Path>) -> Result<IntegrityReport> {
+        let backup = Self::open_reader(path)?;
+        let report = backup.check_integrity()?;
+        backup.close()?;
+        Ok(report)
+    }
+
     /// Validates a backup read-only and restores it to a new V4 file without overwriting.
     pub fn restore_backup(source: impl AsRef<Path>, target: impl AsRef<Path>) -> Result<()> {
         let source = Self::open_reader(source)?;
@@ -1752,6 +1760,7 @@ impl Database {
         let write_result = (|| -> Result<()> {
             let mut copy =
                 Self::create_with_identity(&temporary, self.database_id, target_version)?;
+            crash_pause_if("compaction_after_create");
             let mut collections: Vec<_> = self
                 .collection_names_by_id
                 .iter()
@@ -1848,6 +1857,10 @@ impl Database {
                 }
             }
             copy.close()?;
+            let verified = Self::open_reader(&temporary)?;
+            verified.check_integrity()?;
+            verified.close()?;
+            crash_pause_if("compaction_before_publish");
             Ok(())
         })();
         if let Err(error) = write_result {

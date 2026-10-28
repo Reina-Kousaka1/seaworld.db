@@ -26,6 +26,17 @@ fn main() {
         }
         return;
     }
+    if mode.as_deref().is_some_and(|value| value == "--backup") {
+        let Some(target) = arguments.next().map(PathBuf::from) else {
+            eprintln!("backup mode requires a destination path");
+            process::exit(2);
+        };
+        if let Err(error) = database.backup(target).and_then(|()| database.close()) {
+            eprintln!("could not create backup: {error}");
+            process::exit(7);
+        }
+        return;
+    }
     if mode
         .as_deref()
         .is_some_and(|value| value == "--update-indexed")

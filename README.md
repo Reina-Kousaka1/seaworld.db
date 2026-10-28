@@ -44,7 +44,7 @@ CI runs formatting, Clippy, tests, and a release build on Ubuntu and Windows. `g
 
 Use the `.seaworld.db` suffix. Files contain application data and should not be committed to source control. V4 compaction writes a new file and refuses to overwrite an existing destination; the source remains unchanged.
 
-The CLI is built as `seaworld`. `seaworld DATABASE.seaworld.db` opens or creates an embedded database shell. `seaworld check`, `seaworld backup`, and `seaworld restore` use read-only validation and never overwrite an existing destination.
+The CLI is built as `seaworld`. `seaworld DATABASE.seaworld.db` opens or creates an embedded database shell. `seaworld check`, `seaworld verify`, `seaworld backup`, and `seaworld restore` provide read-only validation and never overwrite an existing destination. See [backup and restore](docs/backup.md) for identity, snapshot, and durability boundaries.
 
 ## Contributing, security, and license
 

@@ -32,8 +32,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             print_usage();
             Ok(())
         }
-        "check" => {
-            let path = required_path(args.next(), "check requires a database path")?;
+        "check" | "verify" => {
+            let path = required_path(args.next(), "check or verify requires a database path")?;
             ensure_no_extra(args)?;
             let database = Database::open_reader(&path)?;
             print_integrity(&database)?;
@@ -245,6 +245,7 @@ fn print_usage() {
     println!("  seaworld DATABASE.seaworld.db");
     println!("  seaworld check DATABASE.seaworld.db");
     println!("  seaworld backup SOURCE.seaworld.db NEW_BACKUP.seaworld.db");
+    println!("  seaworld verify BACKUP.seaworld.db");
     println!("  seaworld restore BACKUP.seaworld.db NEW_DATABASE.seaworld.db");
 }
 

@@ -92,6 +92,14 @@ fn shell_inspection_check_backup_and_restore_smoke() {
     );
     assert!(
         Command::new(env!("CARGO_BIN_EXE_seaworld"))
+            .arg("verify")
+            .arg(&backup.0)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        Command::new(env!("CARGO_BIN_EXE_seaworld"))
             .arg("restore")
             .arg(&backup.0)
             .arg(&restored.0)
