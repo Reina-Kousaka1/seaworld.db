@@ -1,11 +1,47 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::BTreeMap};
 
 use crate::{Document, DocumentId, Error, Result, Value, index::FieldPath};
 
 pub const MAX_QUERY_RESULTS: usize = 100_000;
 pub const MAX_FILTER_NODES: usize = 1_024;
 pub const MAX_FILTER_DEPTH: usize = 64;
+pub const MAX_PROJECTION_FIELDS: usize = 1_024;
+
+/// A bounded set of object paths to include in an owned query result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Projection(Vec<FieldPath>);
+
+impl Projection {
+    /// Builds a projection; duplicate paths are ignored in the result.
+    pub fn new(paths: impl IntoIterator<Item = FieldPath>) -> Result<Self> {
+        let mut fields = Vec::new();
+        for path in paths {
+            if fields.len() >= MAX_PROJECTION_FIELDS {
+                return Err(Error::Limit("too many projection fields".into()));
+            }
+            fields.push(path);
+        }
+        Ok(Self(fields))
+    }
+
+    /// Projects present paths; missing paths are omitted and null is retained.
+    pub fn apply(&self, id: DocumentId, document: &Document) -> ProjectedRow {
+        let fields = self
+            .0
+            .iter()
+            .filter_map(|path| path.get(document).map(|value| (path.clone(), value.clone())))
+            .collect();
+        ProjectedRow { id, fields }
+    }
+}
+
+/// A projected result keyed by validated field paths, with its stable document ID.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProjectedRow {
+    pub id: DocumentId,
+    pub fields: BTreeMap<FieldPath, Value>,
+}
 
 /// Comparison operation in the typed native query AST.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

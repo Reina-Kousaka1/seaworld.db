@@ -448,6 +448,18 @@ impl Snapshot {
         let end = start.saturating_add(query.limit).min(rows.len());
         Ok(rows.drain(start..end).collect())
     }
+    /// Executes and projects a query against this fixed snapshot.
+    pub fn execute_projected(
+        &self,
+        query: &Query,
+        projection: &crate::Projection,
+    ) -> Result<Vec<crate::ProjectedRow>> {
+        Ok(self
+            .execute(query)?
+            .into_iter()
+            .map(|row| projection.apply(row.id, &row.document))
+            .collect())
+    }
 }
 
 fn collection_id_at(state: &MvccState, name: &str, version: CommitVersion) -> Result<i64> {

@@ -1034,6 +1034,19 @@ impl Database {
         Ok(rows.drain(start..end).collect())
     }
 
+    /// Executes a native query and projects its results after sorting and pagination.
+    pub fn execute_projected(
+        &self,
+        query: &Query,
+        projection: &crate::Projection,
+    ) -> Result<Vec<crate::ProjectedRow>> {
+        Ok(self
+            .execute(query)?
+            .into_iter()
+            .map(|row| projection.apply(row.id, row.document))
+            .collect())
+    }
+
     fn validate_query(&self, query: &Query) -> Result<()> {
         self.check_usable()?;
         query::validate_filter(query.filter())?;
