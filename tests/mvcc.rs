@@ -15,7 +15,7 @@ use std::{
 
 use seaworld_db::{
     CompareOp, Database, Document, DocumentId, Error, FieldPath, Filter, Query, QueryPlan,
-    SortDirection, Transaction, Value,
+    Snapshot, SortDirection, Transaction, Value,
 };
 
 static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(1);
@@ -268,6 +268,116 @@ fn two_read_only_handles_coexist_with_the_writer() {
     assert_eq!(reader_a.get("users", id).unwrap(), Some(&document(1)));
     assert_eq!(reader_b.get("users", id).unwrap(), Some(&document(1)));
     assert_eq!(writer.get("users", id).unwrap(), Some(&document(2)));
+}
+
+#[test]
+fn snapshot_and_fixed_reader_retain_query_results_across_writer_commits() {
+    let temp = TempDatabase::new();
+    let mut writer = Database::create(&temp.0).unwrap();
+    writer.create_collection("users").unwrap();
+    let item = |score: i64, name: &str| {
+        Document::empty()
+            .with("score", Value::Integer(score))
+            .with("name", Value::String(name.into()))
+    };
+    let ids: Vec<_> = [(10, "a"), (20, "b"), (30, "c"), (5, "d")]
+        .into_iter()
+        .map(|(score, name)| writer.insert("users", item(score, name)).unwrap())
+        .collect();
+    writer.create_index("users", "score").unwrap();
+    writer.create_unique_index("users", "name").unwrap();
+
+    let score_path = FieldPath::parse("score").unwrap();
+    let equal = Filter::Compare {
+        path: score_path.clone(),
+        op: CompareOp::Eq,
+        value: Value::Integer(20),
+    };
+    let queries = [
+        Query::new("users", Filter::All),
+        Query::new("users", Filter::IdEq(ids[0])),
+        Query::new("users", equal.clone()),
+        Query::new(
+            "users",
+            Filter::Compare {
+                path: FieldPath::parse("name").unwrap(),
+                op: CompareOp::Eq,
+                value: Value::String("b".into()),
+            },
+        ),
+        Query::new(
+            "users",
+            Filter::Compare {
+                path: score_path.clone(),
+                op: CompareOp::Gte,
+                value: Value::Integer(10),
+            },
+        ),
+        Query::new("users", Filter::All)
+            .sort_by(score_path, SortDirection::Ascending)
+            .offset(1)
+            .limit(2),
+        Query::new("users", Filter::Not(Box::new(Filter::Not(Box::new(equal))))),
+    ];
+    let snapshot_rows = |snapshot: &Snapshot, query: &Query| {
+        snapshot
+            .execute(query)
+            .unwrap()
+            .into_iter()
+            .map(|row| (row.id, row.document))
+            .collect::<Vec<_>>()
+    };
+    let reader_rows = |reader: &Database, query: &Query| {
+        reader
+            .execute(query)
+            .unwrap()
+            .into_iter()
+            .map(|row| (row.id, (*row.document).clone()))
+            .collect::<Vec<_>>()
+    };
+
+    let snapshot_a = writer.begin_read().unwrap();
+    let reader_a = Database::open_reader(&temp.0).unwrap();
+    assert!(matches!(reader_a.explain(&queries[0]).unwrap(), QueryPlan::FullScan { .. }));
+    assert!(matches!(reader_a.explain(&queries[1]).unwrap(), QueryPlan::PrimaryKeyLookup { .. }));
+    assert!(matches!(reader_a.explain(&queries[2]).unwrap(), QueryPlan::SecondaryIndexLookup { unique: false, .. }));
+    assert!(matches!(reader_a.explain(&queries[3]).unwrap(), QueryPlan::SecondaryIndexLookup { unique: true, .. }));
+    assert!(matches!(reader_a.explain(&queries[4]).unwrap(), QueryPlan::SecondaryIndexRangeLookup { .. }));
+    assert!(matches!(reader_a.explain(&queries[6]).unwrap(), QueryPlan::FullScan { .. }));
+    let before: Vec<_> = queries.iter().map(|query| snapshot_rows(&snapshot_a, query)).collect();
+    for (query, expected) in queries.iter().zip(&before) {
+        assert!(matches!(snapshot_a.explain(query).unwrap(), QueryPlan::FullScan { .. }));
+        assert_eq!(&reader_rows(&reader_a, query), expected);
+    }
+    assert_eq!(before[2], before[6]);
+
+    let mut transaction = writer.begin_transaction().unwrap();
+    transaction.insert("users", item(15, "e")).unwrap();
+    assert!(transaction.update("users", ids[0], item(0, "a")).unwrap());
+    assert!(transaction.update("users", ids[3], item(25, "d")).unwrap());
+    transaction.commit().unwrap();
+    let mut transaction = writer.begin_transaction().unwrap();
+    assert!(transaction.delete("users", ids[1]).unwrap());
+    assert!(transaction.update("users", ids[2], item(12, "c")).unwrap());
+    transaction.insert("users", item(40, "f")).unwrap();
+    transaction.commit().unwrap();
+    let mut transaction = writer.begin_transaction().unwrap();
+    transaction.insert("users", item(20, "rolled-back")).unwrap();
+    transaction.rollback();
+
+    let snapshot_b = writer.begin_read().unwrap();
+    let reader_b = Database::open_reader(&temp.0).unwrap();
+    assert!(snapshot_b.version() > snapshot_a.version());
+    for (query, expected) in queries.iter().zip(&before) {
+        assert_eq!(&snapshot_rows(&snapshot_a, query), expected);
+        assert_eq!(&reader_rows(&reader_a, query), expected);
+        assert_eq!(snapshot_rows(&snapshot_b, query), reader_rows(&reader_b, query));
+        assert_eq!(reader_rows(&reader_b, query), reader_rows(&writer, query));
+    }
+    assert_ne!(before[0], snapshot_rows(&snapshot_b, &queries[0]));
+    assert_ne!(before[4], snapshot_rows(&snapshot_b, &queries[4]));
+    assert!(snapshot_rows(&snapshot_b, &queries[2]).is_empty());
+    assert_eq!(snapshot_rows(&snapshot_b, &queries[2]), snapshot_rows(&snapshot_b, &queries[6]));
 }
 
 #[test]
