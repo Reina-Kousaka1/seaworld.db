@@ -7,7 +7,7 @@ use std::{
 };
 
 use seaworld_db::{
-    Database, Document, Error, FieldPath, Filter, MAX_PROJECTION_FIELDS, Projection, Query, Value,
+    Database, Document, DocumentOperation, Error, FieldPath, Filter, MAX_PROJECTION_FIELDS, Projection, Query, Value,
 };
 
 static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(1);
@@ -93,9 +93,10 @@ fn array_contains_rechecks_index_candidates_and_snapshot() {
         .unwrap();
     db.insert(
         "items",
-        Document::empty()
-            .with("group", Value::Integer(1))
-            .with("tags", Value::Array(vec![Value::Array(vec![Value::String("a".into())])])),
+        Document::empty().with("group", Value::Integer(1)).with(
+            "tags",
+            Value::Array(vec![Value::Array(vec![Value::String("a".into())])]),
+        ),
     )
     .unwrap();
     db.insert("items", Document::empty().with("group", Value::Integer(1)))
@@ -127,4 +128,57 @@ fn array_contains_rechecks_index_candidates_and_snapshot() {
     db.delete("items", first).unwrap();
     assert!(db.execute(&indexed).unwrap().is_empty());
     assert_eq!(snapshot.execute(&scan).unwrap()[0].id, first);
+}
+
+#[test]
+fn field_updates_are_atomic_and_indexed_across_reopen() {
+    let temp = TempDatabase::new();
+    let mut db = Database::create(&temp.0).unwrap();
+    db.create_collection("items").unwrap();
+    let id = db.insert("items", Document::empty()).unwrap();
+    db.create_index("items", "profile.count").unwrap();
+    let count = FieldPath::parse("profile.count").unwrap();
+    let name = FieldPath::parse("profile.name").unwrap();
+    let mut tx = db.begin_transaction().unwrap();
+    tx.update_fields(
+        "items",
+        id,
+        &[
+            DocumentOperation::Set(name.clone(), Value::String("A".into())),
+            DocumentOperation::Increment(count.clone(), Value::Integer(5)),
+            DocumentOperation::Decrement(count.clone(), Value::Integer(2)),
+        ],
+    )
+    .unwrap();
+    let before_error = tx.get("items", id).unwrap().unwrap().clone();
+    assert!(tx
+        .update_fields(
+            "items",
+            id,
+            &[
+                DocumentOperation::Unset(name.clone()),
+                DocumentOperation::Increment(count.clone(), Value::Integer(i64::MAX)),
+            ],
+        )
+        .is_err());
+    assert_eq!(tx.get("items", id).unwrap(), Some(&before_error));
+    tx.commit().unwrap();
+    let query = Query::new(
+        "items",
+        Filter::Compare {
+            path: count.clone(),
+            op: seaworld_db::CompareOp::Eq,
+            value: Value::Integer(3),
+        },
+    );
+    assert_eq!(db.execute(&query).unwrap()[0].id, id);
+    let mut tx = db.begin_transaction().unwrap();
+    tx.update_fields("items", id, &[DocumentOperation::Unset(name)])
+        .unwrap();
+    tx.rollback();
+    assert_eq!(db.get("items", id).unwrap(), Some(&before_error));
+    db.close().unwrap();
+    let reopened = Database::open_reader(&temp.0).unwrap();
+    assert_eq!(reopened.execute(&query).unwrap()[0].id, id);
+    assert_eq!(reopened.get("items", id).unwrap(), Some(&before_error));
 }

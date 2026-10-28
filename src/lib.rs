@@ -15,6 +15,7 @@ mod mvcc;
 mod query;
 mod sql;
 mod storage;
+mod update;
 
 pub use document::{Document, MAX_DOCUMENT_BYTES, Value};
 pub use error::{Error, Result};
@@ -31,6 +32,7 @@ pub use storage::{
     Database, IndexInfo, IntegrityReport, MAX_COLLECTIONS, MAX_DATABASE_BYTES, MAX_DOCUMENTS,
     RecoveryReport, Transaction,
 };
+pub use update::{DocumentOperation, apply_document_operations};
 
 /// A stable, positive identifier assigned to a document within a database.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

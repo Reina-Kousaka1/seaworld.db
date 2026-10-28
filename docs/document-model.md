@@ -46,3 +46,12 @@ Native `Projection` returns stable IDs and a map of requested `FieldPath` values
 Missing paths are omitted, while null is retained; arrays are returned as whole
 values and paths traverse objects only. Projection happens after filtering,
 sorting and pagination and is available on both database handles and snapshots.
+
+`Transaction::update_fields` applies up to 1,024 ordered set, unset, increment
+or decrement operations to a copy before staging a replacement. A failed update
+leaves the staged document unchanged; transaction commit and rollback retain
+their existing behavior. Set and numeric operations create missing parent objects;
+unset on a missing path is a no-op. Traversing a scalar or array is an error.
+Numeric updates require matching integer or finite float types, use zero for a
+missing leaf, reject integer overflow and non-finite float results, and do not
+coerce types. Index constraints are checked by the existing transaction layer.

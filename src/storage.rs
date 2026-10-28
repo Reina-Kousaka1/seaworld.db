@@ -3107,6 +3107,20 @@ impl<'database> Transaction<'database> {
         Ok(true)
     }
 
+    /// Applies document operations as one staged replacement.
+    pub fn update_fields(
+        &mut self,
+        collection_name: &str,
+        id: DocumentId,
+        operations: &[crate::DocumentOperation],
+    ) -> Result<bool> {
+        let Some(document) = self.get(collection_name, id)? else {
+            return Ok(false);
+        };
+        let updated = crate::apply_document_operations(document, operations)?;
+        self.update(collection_name, id, updated)
+    }
+
     /// Deletes a document visible in this transaction.
     pub fn delete(&mut self, collection_name: &str, id: DocumentId) -> Result<bool> {
         self.database.check_usable()?;
