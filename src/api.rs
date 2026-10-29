@@ -12,7 +12,10 @@ impl RequestId {
     /// Validates a nonempty, bounded, printable ASCII correlation identifier.
     pub fn new(value: impl Into<String>) -> Result<Self> {
         let value = value.into();
-        if value.is_empty() || value.len() > 128 || !value.bytes().all(|byte| (0x21..=0x7e).contains(&byte)) {
+        if value.is_empty()
+            || value.len() > 128
+            || !value.bytes().all(|byte| (0x21..=0x7e).contains(&byte))
+        {
             return Err(Error::InvalidInput("invalid request ID".into()));
         }
         Ok(Self(value))

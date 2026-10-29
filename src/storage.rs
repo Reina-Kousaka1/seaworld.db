@@ -1048,15 +1048,25 @@ impl Database {
     }
 
     /// Applies operations to the first matching document in one transaction.
-    pub fn update_one(&mut self, query: &Query, operations: &[crate::DocumentOperation]) -> Result<usize> {
+    pub fn update_one(
+        &mut self,
+        query: &Query,
+        operations: &[crate::DocumentOperation],
+    ) -> Result<usize> {
         self.update_many(&query.clone().limit(query.limit.min(1)), operations)
     }
 
     /// Applies operations to the selected committed view in one transaction.
-    pub fn update_many(&mut self, query: &Query, operations: &[crate::DocumentOperation]) -> Result<usize> {
+    pub fn update_many(
+        &mut self,
+        query: &Query,
+        operations: &[crate::DocumentOperation],
+    ) -> Result<usize> {
         self.check_writable()?;
         if self.format_version < TRANSACTION_FORMAT_VERSION {
-            return Err(Error::UpgradeRequired("transactional format required".into()));
+            return Err(Error::UpgradeRequired(
+                "transactional format required".into(),
+            ));
         }
         let ids: Vec<_> = self.execute(query)?.into_iter().map(|row| row.id).collect();
         if ids.is_empty() {
@@ -1079,7 +1089,9 @@ impl Database {
     pub fn delete_many(&mut self, query: &Query) -> Result<usize> {
         self.check_writable()?;
         if self.format_version < TRANSACTION_FORMAT_VERSION {
-            return Err(Error::UpgradeRequired("transactional format required".into()));
+            return Err(Error::UpgradeRequired(
+                "transactional format required".into(),
+            ));
         }
         let ids: Vec<_> = self.execute(query)?.into_iter().map(|row| row.id).collect();
         if ids.is_empty() {
