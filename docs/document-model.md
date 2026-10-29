@@ -55,3 +55,10 @@ unset on a missing path is a no-op. Traversing a scalar or array is an error.
 Numeric updates require matching integer or finite float types, use zero for a
 missing leaf, reject integer overflow and non-finite float results, and do not
 coerce types. Index constraints are checked by the existing transaction layer.
+
+`Database::update_one`, `update_many`, `delete_one` and `delete_many` select
+the query's committed view, respecting sorting, offset and limit, then stage all
+selected changes in one transaction. The `one` variants additionally cap the
+limit at one. If an operation or commit fails, no partial successful result is
+reported. These convenience methods require a writable V2–V4 handle; they do
+not query a caller's already-staged transaction. Upsert is not implemented.

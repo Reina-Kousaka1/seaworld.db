@@ -1047,6 +1047,52 @@ impl Database {
             .collect())
     }
 
+    /// Applies operations to the first matching document in one transaction.
+    pub fn update_one(&mut self, query: &Query, operations: &[crate::DocumentOperation]) -> Result<usize> {
+        self.update_many(&query.clone().limit(query.limit.min(1)), operations)
+    }
+
+    /// Applies operations to the selected committed view in one transaction.
+    pub fn update_many(&mut self, query: &Query, operations: &[crate::DocumentOperation]) -> Result<usize> {
+        self.check_writable()?;
+        if self.format_version < TRANSACTION_FORMAT_VERSION {
+            return Err(Error::UpgradeRequired("transactional format required".into()));
+        }
+        let ids: Vec<_> = self.execute(query)?.into_iter().map(|row| row.id).collect();
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let mut transaction = self.begin_transaction()?;
+        for id in &ids {
+            transaction.update_fields(query.collection(), *id, operations)?;
+        }
+        transaction.commit()?;
+        Ok(ids.len())
+    }
+
+    /// Deletes the first matching document in one transaction.
+    pub fn delete_one(&mut self, query: &Query) -> Result<usize> {
+        self.delete_many(&query.clone().limit(query.limit.min(1)))
+    }
+
+    /// Deletes the selected committed view in one transaction.
+    pub fn delete_many(&mut self, query: &Query) -> Result<usize> {
+        self.check_writable()?;
+        if self.format_version < TRANSACTION_FORMAT_VERSION {
+            return Err(Error::UpgradeRequired("transactional format required".into()));
+        }
+        let ids: Vec<_> = self.execute(query)?.into_iter().map(|row| row.id).collect();
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let mut transaction = self.begin_transaction()?;
+        for id in &ids {
+            transaction.delete(query.collection(), *id)?;
+        }
+        transaction.commit()?;
+        Ok(ids.len())
+    }
+
     fn validate_query(&self, query: &Query) -> Result<()> {
         self.check_usable()?;
         query::validate_filter(query.filter())?;

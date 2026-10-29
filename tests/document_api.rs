@@ -184,3 +184,45 @@ fn field_updates_are_atomic_and_indexed_across_reopen() {
     assert_eq!(reopened.execute(&query).unwrap()[0].id, id);
     assert_eq!(reopened.get("items", id).unwrap(), Some(&before_error));
 }
+
+#[test]
+fn public_api_metadata_and_error_codes_are_transport_neutral() {
+    assert_eq!(seaworld_db::API_VERSION, "0.1");
+    assert!(seaworld_db::capabilities().projections);
+    assert!(!seaworld_db::capabilities().durable_request_deduplication);
+    let request_id = seaworld_db::RequestId::new("operation-17").unwrap();
+    assert_eq!(request_id.as_str(), "operation-17");
+    assert!(seaworld_db::RequestId::new("").is_err());
+    assert!(seaworld_db::RequestId::new("space in id").is_err());
+    assert!(seaworld_db::RequestId::new("x".repeat(129)).is_err());
+    assert_eq!(Error::Locked.code(), seaworld_db::ErrorCode::Locked);
+    assert_eq!(
+        Error::Integrity("detail".into()).code(),
+        seaworld_db::ErrorCode::Corrupt
+    );
+}
+
+#[test]
+fn bulk_updates_and_deletes_are_atomic_and_snapshot_safe() {
+    let temp = TempDatabase::new();
+    let mut db = Database::create(&temp.0).unwrap();
+    db.create_collection("items").unwrap();
+    let first = db.insert("items", Document::empty().with("n", Value::Integer(1))).unwrap();
+    let second = db.insert("items", Document::empty().with("n", Value::String("wrong".into()))).unwrap();
+    let query = Query::new("items", Filter::All);
+    let path = FieldPath::parse("n").unwrap();
+    let snapshot = db.begin_read().unwrap();
+    let increment = [DocumentOperation::Increment(path.clone(), Value::Integer(1))];
+    assert!(db.update_many(&query, &increment).is_err());
+    assert_eq!(db.get("items", first).unwrap().unwrap().get("n"), Some(&Value::Integer(1)));
+    assert_eq!(db.update_one(&query, &increment).unwrap(), 1);
+    assert_eq!(db.get("items", first).unwrap().unwrap().get("n"), Some(&Value::Integer(2)));
+    assert_eq!(db.delete_one(&query).unwrap(), 1);
+    assert_eq!(db.delete_many(&query).unwrap(), 1);
+    assert!(db.get("items", second).unwrap().is_none());
+    assert_eq!(snapshot.execute(&query).unwrap().len(), 2);
+    drop(snapshot);
+    db.close().unwrap();
+    let reopened = Database::open_reader(&temp.0).unwrap();
+    assert!(reopened.execute(&query).unwrap().is_empty());
+}
