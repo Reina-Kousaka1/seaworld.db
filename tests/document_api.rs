@@ -250,10 +250,26 @@ fn public_engine_boundary_uses_the_existing_backend() {
     let engine: &mut dyn seaworld_db::PublicEngine = &mut database;
     engine.create_collection("items").unwrap();
     let mut tx = engine.begin().unwrap();
-    let id = tx.insert("items", Document::empty().with("name", Value::String("A".into()))).unwrap();
+    let id = tx
+        .insert(
+            "items",
+            Document::empty().with("name", Value::String("A".into())),
+        )
+        .unwrap();
     assert!(tx.get("items", id).unwrap().is_some());
     tx.commit().unwrap();
-    assert_eq!(engine.query(&Query::new("items", Filter::All)).unwrap().len(), 1);
+    assert_eq!(
+        engine
+            .query(&Query::new("items", Filter::All))
+            .unwrap()
+            .len(),
+        1
+    );
     assert!(engine.get("items", id).unwrap().is_some());
-    assert_eq!(engine.delete(&Query::new("items", Filter::IdEq(id))).unwrap(), 1);
+    assert_eq!(
+        engine
+            .delete(&Query::new("items", Filter::IdEq(id)))
+            .unwrap(),
+        1
+    );
 }

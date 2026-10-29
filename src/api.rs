@@ -69,7 +69,12 @@ pub trait PublicEngine {
 pub trait PublicTransaction {
     fn insert(&mut self, collection: &str, document: Document) -> Result<DocumentId>;
     fn get(&self, collection: &str, id: DocumentId) -> Result<Option<Document>>;
-    fn update_fields(&mut self, collection: &str, id: DocumentId, operations: &[DocumentOperation]) -> Result<bool>;
+    fn update_fields(
+        &mut self,
+        collection: &str,
+        id: DocumentId,
+        operations: &[DocumentOperation],
+    ) -> Result<bool>;
     fn delete(&mut self, collection: &str, id: DocumentId) -> Result<bool>;
     fn commit(self: Box<Self>) -> Result<()>;
     fn rollback(self: Box<Self>);
@@ -86,7 +91,14 @@ impl PublicEngine for Database {
         Ok(Database::get(self, collection, id)?.cloned())
     }
     fn query(&self, query: &Query) -> Result<Vec<SnapshotRow>> {
-        Ok(self.execute(query)?.into_iter().map(|row| SnapshotRow { id: row.id, document: row.document.clone() }).collect())
+        Ok(self
+            .execute(query)?
+            .into_iter()
+            .map(|row| SnapshotRow {
+                id: row.id,
+                document: row.document.clone(),
+            })
+            .collect())
     }
     fn update(&mut self, query: &Query, operations: &[DocumentOperation]) -> Result<usize> {
         self.update_many(query, operations)
@@ -106,7 +118,12 @@ impl PublicTransaction for Transaction<'_> {
     fn get(&self, collection: &str, id: DocumentId) -> Result<Option<Document>> {
         Ok(Transaction::get(self, collection, id)?.cloned())
     }
-    fn update_fields(&mut self, collection: &str, id: DocumentId, operations: &[DocumentOperation]) -> Result<bool> {
+    fn update_fields(
+        &mut self,
+        collection: &str,
+        id: DocumentId,
+        operations: &[DocumentOperation],
+    ) -> Result<bool> {
         Transaction::update_fields(self, collection, id, operations)
     }
     fn delete(&mut self, collection: &str, id: DocumentId) -> Result<bool> {
