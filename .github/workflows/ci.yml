@@ -23,6 +23,8 @@ jobs:
           components: clippy, rustfmt
       - name: Check formatting
         run: cargo fmt --all -- --check
+      - name: Check whitespace
+        run: git diff --check
       - name: Clippy without test hooks
         run: cargo clippy --all-targets --locked -- -D warnings
       - name: Clippy with crash-test harness

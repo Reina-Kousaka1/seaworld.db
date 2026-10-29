@@ -52,7 +52,8 @@ directory synchronization where supported. Linux and Windows process-kill CI doe
 not prove survival of OS crashes, power loss, dishonest devices, or arbitrary
 filesystems. CRC32C detects accidental damage but does not authenticate data.
 See [storage](storage-format.md), [transactions](transactions.md) and
-[backups](backup.md) for details and limitations.
+[backups](backup.md), and [platform qualification](platform-support.md) for
+details and limitations.
 
 ## V1 release gate
 
@@ -66,8 +67,9 @@ See [storage](storage-format.md), [transactions](transactions.md) and
 - Qualify generated document mutations and differential indexed queries across
   reopen, snapshots, failure, recovery and compatibility fixtures; expand fuzz
   and process-crash coverage beyond the present tests.
-- Establish supported platform/filesystem, resource and durability guarantees,
-  with explicit evidence for each guarantee and migration compatibility gate.
+- Keep the Linux/Windows CI qualification and conservative filesystem/durability
+  boundary current as release evidence; ARM64 and other platforms remain
+  unqualified until separately tested. Preserve the migration compatibility gate.
 
 ### POST-V1
 

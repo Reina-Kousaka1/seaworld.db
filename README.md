@@ -27,6 +27,9 @@ The [compatibility contract and V1 release gate](docs/compatibility-contract.md)
 The transport-neutral [public API foundation contract](docs/public-api.md)
 defines owned query results, correlation IDs, error codes, capabilities, and
 the boundary a future backend must preserve.
+The [platform and durability qualification](docs/platform-support.md) records
+the Linux/Windows CI baseline and, just as importantly, the power-loss and
+filesystem guarantees SeaWorld does not claim.
 
 ## Architecture
 
