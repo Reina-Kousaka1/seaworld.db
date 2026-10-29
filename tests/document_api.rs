@@ -411,6 +411,7 @@ fn document_operations_survive_backup_restore_and_compaction() {
 }
 
 proptest::proptest! {
+    #![proptest_config(proptest::test_runner::Config { cases: 16, ..proptest::test_runner::Config::default() })]
     #[test]
     fn generated_updates_match_integer_model(steps in proptest::collection::vec((0u8..4, -100i64..100), 0..64)) {
         let path = FieldPath::parse("counter").unwrap();
@@ -427,5 +428,34 @@ proptest::proptest! {
             let expected = model.map(Value::Integer);
             proptest::prop_assert_eq!(document.get("counter"), expected.as_ref());
         }
+    }
+
+    #[test]
+    fn generated_indexed_array_predicates_match_full_scans(values in proptest::collection::vec((0i64..5, proptest::prelude::any::<bool>()), 1..9), target in 0i64..5) {
+        let temp = TempDatabase::new();
+        let mut db = Database::create(&temp.0).unwrap();
+        db.create_collection("items").unwrap();
+        for (group, contains) in values {
+            let tags = if contains { vec![Value::String("a".into())] } else { vec![] };
+            db.insert("items", Document::empty().with("group", Value::Integer(group)).with("tags", Value::Array(tags))).unwrap();
+        }
+        db.create_index("items", "group").unwrap();
+        let predicate = Filter::And(vec![
+            Filter::Compare { path: FieldPath::parse("group").unwrap(), op: seaworld_db::CompareOp::Eq, value: Value::Integer(target) },
+            Filter::ArrayContains { path: FieldPath::parse("tags").unwrap(), value: Value::String("a".into()) },
+        ]);
+        let indexed = Query::new("items", predicate.clone());
+        let scan = Query::new("items", Filter::Not(Box::new(Filter::Not(Box::new(predicate)))));
+        let rows = |db: &Database, q: &Query| db.execute(q).unwrap().into_iter().map(|row| row.id).collect::<Vec<_>>();
+        proptest::prop_assert_eq!(rows(&db, &indexed), rows(&db, &scan));
+        let snapshot = db.begin_read().unwrap();
+        let before = snapshot.execute(&scan).unwrap();
+        db.delete_many(&indexed).unwrap();
+        proptest::prop_assert_eq!(snapshot.execute(&scan).unwrap(), before);
+        proptest::prop_assert_eq!(rows(&db, &indexed), rows(&db, &scan));
+        drop(snapshot);
+        db.close().unwrap();
+        let db = Database::open_reader(&temp.0).unwrap();
+        proptest::prop_assert_eq!(rows(&db, &indexed), rows(&db, &scan));
     }
 }

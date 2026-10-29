@@ -23,6 +23,8 @@ The B+Tree currently supports scalar single-field keys. Old copy-on-write pages 
 
 SeaWorld does not claim production readiness, full ACID compliance, complete SQL compatibility, distribution, or production security. Process-kill tests do not prove power-loss durability. CRC32C checks detect accidental corruption; they do not authenticate a file.
 
+The [compatibility contract and V1 release gate](docs/compatibility-contract.md) describe supported formats, limits, durability boundaries, and remaining release blockers.
+
 ## Architecture
 
 Applications use one document-native engine. The native API and SQL V0 lower into the same query representation and planner. No separate SQL storage path is planned. See [architecture](docs/architecture.md), [persistent index storage](docs/index-storage.md), and [transactions](docs/transactions.md).
