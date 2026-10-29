@@ -370,6 +370,14 @@ fn public_engine_boundary_uses_the_existing_backend() {
 }
 
 #[test]
+fn owned_public_engine_has_an_explicit_close_lifecycle() {
+    let temp = TempDatabase::new();
+    let engine: Box<dyn seaworld_db::PublicEngine> = Box::new(Database::create(&temp.0).unwrap());
+    engine.close().unwrap();
+    assert!(Database::open_reader(&temp.0).is_ok());
+}
+
+#[test]
 fn upsert_uses_explicit_insert_base_and_existing_match() {
     let temp = TempDatabase::new();
     let mut db = Database::create(&temp.0).unwrap();

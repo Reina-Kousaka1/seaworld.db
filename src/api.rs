@@ -67,6 +67,7 @@ impl OperationContext {
 
 /// Implemented engine capabilities. No network service or idempotency is implied.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Capabilities {
     pub native_queries: bool,
     pub projections: bool,
@@ -96,6 +97,7 @@ impl Capabilities {
 
 /// Version and declared capabilities returned by an engine instance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ApiInfo {
     pub version: &'static str,
     pub capabilities: Capabilities,
@@ -103,6 +105,7 @@ pub struct ApiInfo {
 
 /// Readiness of an already-open engine handle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum EngineHealth {
     Ready,
 }
@@ -120,6 +123,7 @@ pub struct PublicQueryRow {
 
 /// The payload of a public query row.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum PublicRowValue {
     Document(Document),
     Projection(BTreeMap<FieldPath, Value>),
@@ -164,6 +168,8 @@ pub trait PublicEngine {
     fn api_info(&self) -> ApiInfo;
     /// Reports whether an already-open engine handle can serve operations.
     fn health(&self) -> EngineHealth;
+    /// Closes an owned engine handle after pending work has completed.
+    fn close(self: Box<Self>) -> Result<()>;
     fn collection_names(&self) -> Result<Vec<String>>;
     fn create_collection(&mut self, name: &str) -> Result<CollectionId>;
     fn insert(&mut self, collection: &str, document: Document) -> Result<DocumentId>;
@@ -227,6 +233,10 @@ impl PublicEngine for Database {
 
     fn health(&self) -> EngineHealth {
         EngineHealth::Ready
+    }
+
+    fn close(self: Box<Self>) -> Result<()> {
+        Database::close(*self)
     }
 
     fn collection_names(&self) -> Result<Vec<String>> {

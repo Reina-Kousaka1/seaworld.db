@@ -9,10 +9,11 @@ the same public contract.
 ## Lifecycle and metadata
 
 `PublicEngine::api_info` returns the public foundation version and an explicit
-capability descriptor. `health` reports an already-open engine as `Ready`; open,
-recovery, and validation errors are returned before an engine exists. A driver
-must not infer health from a filesystem path or from a successful previous
-request. The public data surface provides collection listing/creation, owned
+capability descriptor. `health` reports an already-open engine as `Ready`; an
+owned trait object can be closed explicitly with `close`. Open, recovery, and
+validation errors are returned before an engine exists. A driver must not infer
+health from a filesystem path or from a successful previous request. The public
+data surface provides collection listing/creation, owned
 document reads, query, projected query, insert, update, delete, upsert, and an
 explicit transaction lifetime. Backup, restore, compaction, migration, and
 integrity inspection are administration APIs, not ordinary client operations.
@@ -62,8 +63,10 @@ unknown format versions, incompatible required features, corrupt format,
 integrity failures, recovery requirements, I/O, and internal invariants.
 Unknown/newer file versions are `unknown_format_version`, not corruption.
 
-`ErrorCode` is marked non-exhaustive. New codes can be additive in a later
-foundation version; consumers must include a fallback path. Capability names
+`ErrorCode`, `Capabilities`, `ApiInfo`, `EngineHealth`, and `PublicRowValue` are
+marked non-exhaustive where callers might otherwise rely on an exhaustive Rust
+match or literal. New codes can be additive in a later foundation version;
+consumers must include a fallback path. Capability names
 are lowercase ASCII with underscores. `Capabilities::supports` returns `Some`
 for every known name (including known unsupported features) and `None` for an
 unknown future name. Older clients must preserve that distinction and must not
