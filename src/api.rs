@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-use crate::{Error, Result};
+use crate::{
+    CollectionId, Database, Document, DocumentId, DocumentOperation, Error, Query, Result,
+    SnapshotRow, Transaction,
+};
 
 /// Version of the transport-neutral SeaWorld API foundation, not the file format.
 pub const API_VERSION: &str = "0.1";
@@ -47,5 +50,72 @@ pub const fn capabilities() -> Capabilities {
         field_updates: true,
         transactions: true,
         durable_request_deduplication: false,
+    }
+}
+
+/// Transport-neutral operations implemented by an embedded engine.
+/// Backup and administration deliberately remain outside this interface.
+pub trait PublicEngine {
+    fn create_collection(&mut self, name: &str) -> Result<CollectionId>;
+    fn insert(&mut self, collection: &str, document: Document) -> Result<DocumentId>;
+    fn get(&self, collection: &str, id: DocumentId) -> Result<Option<Document>>;
+    fn query(&self, query: &Query) -> Result<Vec<SnapshotRow>>;
+    fn update(&mut self, query: &Query, operations: &[DocumentOperation]) -> Result<usize>;
+    fn delete(&mut self, query: &Query) -> Result<usize>;
+    fn begin(&mut self) -> Result<Box<dyn PublicTransaction + '_>>;
+}
+
+/// A transaction tied to its engine handle; dropping it discards staged changes.
+pub trait PublicTransaction {
+    fn insert(&mut self, collection: &str, document: Document) -> Result<DocumentId>;
+    fn get(&self, collection: &str, id: DocumentId) -> Result<Option<Document>>;
+    fn update_fields(&mut self, collection: &str, id: DocumentId, operations: &[DocumentOperation]) -> Result<bool>;
+    fn delete(&mut self, collection: &str, id: DocumentId) -> Result<bool>;
+    fn commit(self: Box<Self>) -> Result<()>;
+    fn rollback(self: Box<Self>);
+}
+
+impl PublicEngine for Database {
+    fn create_collection(&mut self, name: &str) -> Result<CollectionId> {
+        Database::create_collection(self, name)
+    }
+    fn insert(&mut self, collection: &str, document: Document) -> Result<DocumentId> {
+        Database::insert(self, collection, document)
+    }
+    fn get(&self, collection: &str, id: DocumentId) -> Result<Option<Document>> {
+        Ok(Database::get(self, collection, id)?.cloned())
+    }
+    fn query(&self, query: &Query) -> Result<Vec<SnapshotRow>> {
+        Ok(self.execute(query)?.into_iter().map(|row| SnapshotRow { id: row.id, document: row.document.clone() }).collect())
+    }
+    fn update(&mut self, query: &Query, operations: &[DocumentOperation]) -> Result<usize> {
+        self.update_many(query, operations)
+    }
+    fn delete(&mut self, query: &Query) -> Result<usize> {
+        self.delete_many(query)
+    }
+    fn begin(&mut self) -> Result<Box<dyn PublicTransaction + '_>> {
+        Ok(Box::new(self.begin_transaction()?))
+    }
+}
+
+impl PublicTransaction for Transaction<'_> {
+    fn insert(&mut self, collection: &str, document: Document) -> Result<DocumentId> {
+        Transaction::insert(self, collection, document)
+    }
+    fn get(&self, collection: &str, id: DocumentId) -> Result<Option<Document>> {
+        Ok(Transaction::get(self, collection, id)?.cloned())
+    }
+    fn update_fields(&mut self, collection: &str, id: DocumentId, operations: &[DocumentOperation]) -> Result<bool> {
+        Transaction::update_fields(self, collection, id, operations)
+    }
+    fn delete(&mut self, collection: &str, id: DocumentId) -> Result<bool> {
+        Transaction::delete(self, collection, id)
+    }
+    fn commit(self: Box<Self>) -> Result<()> {
+        Transaction::commit(*self)
+    }
+    fn rollback(self: Box<Self>) {
+        Transaction::rollback(*self)
     }
 }

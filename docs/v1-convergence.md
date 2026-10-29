@@ -12,6 +12,10 @@ bounded request correlation ID and typed error categories. These are
 transport-neutral building blocks, not a server or a completed stable V1
 protocol. Capabilities describe engine features; transactions and field updates
 require a transactional V2–V4 database. Request IDs do not imply deduplication.
+`PublicEngine` and `PublicTransaction` provide an engine-independent Rust
+interface for collections, owned reads, queries, writes and transactions. The
+current `Database` implements this boundary; no second backend is provided.
+The interface does not provide a stable foreign-language ABI or wire protocol.
 
 ## Candidate transport-neutral contract
 
