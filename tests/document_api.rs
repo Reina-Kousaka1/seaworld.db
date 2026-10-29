@@ -196,10 +196,32 @@ fn public_api_metadata_and_error_codes_are_transport_neutral() {
     assert!(seaworld_db::RequestId::new("space in id").is_err());
     assert!(seaworld_db::RequestId::new("x".repeat(129)).is_err());
     assert_eq!(Error::Locked.code(), seaworld_db::ErrorCode::Locked);
+    assert_eq!(Error::Locked.code().as_str(), "locked");
+    assert_eq!(seaworld_db::capabilities().supports("projections"), Some(true));
+    assert_eq!(seaworld_db::capabilities().supports("unknown"), None);
     assert_eq!(
         Error::Integrity("detail".into()).code(),
         seaworld_db::ErrorCode::Corrupt
     );
+}
+
+#[test]
+fn unique_conflict_in_bulk_update_does_not_publish_any_change() {
+    let temp = TempDatabase::new();
+    let mut db = Database::create(&temp.0).unwrap();
+    db.create_collection("items").unwrap();
+    let first = db.insert("items", Document::empty().with("key", Value::Integer(1))).unwrap();
+    let second = db.insert("items", Document::empty().with("key", Value::Integer(2))).unwrap();
+    db.create_unique_index("items", "key").unwrap();
+    let query = Query::new("items", Filter::All);
+    let op = DocumentOperation::Set(FieldPath::parse("key").unwrap(), Value::Integer(3));
+    assert!(matches!(db.update_many(&query, &[op]), Err(Error::ConstraintViolation(_))));
+    assert_eq!(db.get("items", first).unwrap().unwrap().get("key"), Some(&Value::Integer(1)));
+    assert_eq!(db.get("items", second).unwrap().unwrap().get("key"), Some(&Value::Integer(2)));
+    db.close().unwrap();
+    let reopened = Database::open_reader(&temp.0).unwrap();
+    assert_eq!(reopened.get("items", first).unwrap().unwrap().get("key"), Some(&Value::Integer(1)));
+    assert_eq!(reopened.get("items", second).unwrap().unwrap().get("key"), Some(&Value::Integer(2)));
 }
 
 #[test]
@@ -364,4 +386,24 @@ fn document_operations_survive_backup_restore_and_compaction() {
     restored_db.write_v4_compacted_copy(&compacted.0).unwrap();
     let compacted_db = Database::open_reader(&compacted.0).unwrap();
     assert_eq!(compacted_db.execute(&query).unwrap()[0].id, id);
+}
+
+proptest::proptest! {
+    #[test]
+    fn generated_updates_match_integer_model(steps in proptest::collection::vec((0u8..4, -100i64..100), 0..64)) {
+        let path = FieldPath::parse("counter").unwrap();
+        let mut document = Document::empty();
+        let mut model: Option<i64> = None;
+        for (kind, value) in steps {
+            let op = match kind {
+                0 => { model = Some(value); DocumentOperation::Set(path.clone(), Value::Integer(value)) }
+                1 => { model = None; DocumentOperation::Unset(path.clone()) }
+                2 => { model = Some(model.unwrap_or(0) + value); DocumentOperation::Increment(path.clone(), Value::Integer(value)) }
+                _ => { model = Some(model.unwrap_or(0) - value); DocumentOperation::Decrement(path.clone(), Value::Integer(value)) }
+            };
+            document = seaworld_db::apply_document_operations(&document, &[op]).unwrap();
+            let expected = model.map(Value::Integer);
+            proptest::prop_assert_eq!(document.get("counter"), expected.as_ref());
+        }
+    }
 }

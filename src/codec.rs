@@ -23,6 +23,12 @@ pub(crate) fn validate_value(value: &Value) -> Result<()> {
     encoder.value(value, 1)
 }
 
+pub(crate) fn encoded_value_len(value: &Value) -> Result<usize> {
+    let mut encoder = Encoder::default();
+    encoder.value(value, 1)?;
+    Ok(encoder.bytes.len())
+}
+
 pub(crate) fn decode_document(bytes: &[u8]) -> Result<Document> {
     if bytes.len() > MAX_DOCUMENT_BYTES {
         return Err(Error::Integrity("document exceeds the maximum size".into()));

@@ -44,6 +44,26 @@ pub enum ErrorCode {
     Internal,
 }
 
+impl ErrorCode {
+    /// Stable machine-readable category; error details are not included.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Io => "io",
+            Self::Locked => "locked",
+            Self::ReadOnly => "read_only",
+            Self::RecoveryRequired => "recovery_required",
+            Self::Corrupt => "corrupt",
+            Self::InvalidInput => "invalid_input",
+            Self::ResourceLimit => "resource_limit",
+            Self::NotFound => "not_found",
+            Self::Conflict => "conflict",
+            Self::Unsupported => "unsupported",
+            Self::Transaction => "transaction",
+            Self::Internal => "internal",
+        }
+    }
+}
+
 impl Error {
     /// Maps internal errors to a transport-neutral category without exposing paths.
     pub fn code(&self) -> ErrorCode {

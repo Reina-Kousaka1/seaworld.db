@@ -41,6 +41,21 @@ pub struct Capabilities {
     pub durable_request_deduplication: bool,
 }
 
+impl Capabilities {
+    /// Returns None for unknown names so callers can distinguish unsupported from unknown.
+    pub fn supports(&self, name: &str) -> Option<bool> {
+        match name {
+            "native_queries" => Some(self.native_queries),
+            "projections" => Some(self.projections),
+            "array_contains" => Some(self.array_contains),
+            "field_updates" => Some(self.field_updates),
+            "transactions" => Some(self.transactions),
+            "durable_request_deduplication" => Some(self.durable_request_deduplication),
+            _ => None,
+        }
+    }
+}
+
 /// Returns the capabilities of the existing embedded engine.
 pub const fn capabilities() -> Capabilities {
     Capabilities {

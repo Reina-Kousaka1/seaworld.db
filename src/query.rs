@@ -7,6 +7,8 @@ pub const MAX_QUERY_RESULTS: usize = 100_000;
 pub const MAX_FILTER_NODES: usize = 1_024;
 pub const MAX_FILTER_DEPTH: usize = 64;
 pub const MAX_PROJECTION_FIELDS: usize = 1_024;
+/// Projection budget in encoded value and path bytes plus per-field accounting.
+pub const MAX_PROJECTED_BYTES: usize = 128 * 1024 * 1024;
 
 /// A bounded set of object paths to include in an owned query result.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,6 +38,31 @@ impl Projection {
             })
             .collect();
         ProjectedRow { id, fields }
+    }
+
+    pub(crate) fn apply_bounded(
+        &self,
+        id: DocumentId,
+        document: &Document,
+        budget: &mut usize,
+    ) -> Result<ProjectedRow> {
+        let mut fields = BTreeMap::new();
+        for path in &self.0 {
+            if fields.contains_key(path) {
+                continue;
+            }
+            if let Some(value) = path.get(document) {
+                let size = path.segments().iter().try_fold(
+                    crate::codec::encoded_value_len(value)?.saturating_add(128),
+                    |size, segment| size.checked_add(segment.len()),
+                ).ok_or_else(|| Error::Limit("projection size overflow".into()))?;
+                *budget = budget.checked_sub(size).ok_or_else(|| {
+                    Error::Limit("projected query result exceeds its byte limit".into())
+                })?;
+                fields.insert(path.clone(), value.clone());
+            }
+        }
+        Ok(ProjectedRow { id, fields })
     }
 }
 
@@ -289,5 +316,22 @@ pub(crate) fn ordered_values(left: &Value, right: &Value) -> Option<Ordering> {
         }
         (Value::String(left), Value::String(right)) => Some(left.cmp(right)),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod projection_budget_tests {
+    use super::*;
+
+    #[test]
+    fn budget_rejects_before_cloning_oversized_projection() {
+        let path = FieldPath::parse("data").unwrap();
+        let projection = Projection::new([path]).unwrap();
+        let document = Document::empty().with("data", Value::String("large".into()));
+        let mut budget = 1;
+        assert!(matches!(
+            projection.apply_bounded(DocumentId::new(1).unwrap(), &document, &mut budget),
+            Err(Error::Limit(_))
+        ));
     }
 }

@@ -20,6 +20,7 @@ pub fn apply_document_operations(
     if operations.len() > 1_024 {
         return Err(Error::Limit("too many document operations".into()));
     }
+    crate::codec::encode_document(document)?;
     let mut result = document.clone();
     for operation in operations {
         let (path, create) = match operation {
@@ -36,6 +37,7 @@ pub fn apply_document_operations(
         };
         match operation {
             DocumentOperation::Set(_, value) => {
+                crate::codec::validate_value(value)?;
                 fields.insert(last.clone(), value.clone());
             }
             DocumentOperation::Unset(_) => {
@@ -91,8 +93,8 @@ pub fn apply_document_operations(
                 fields.insert(last.clone(), value);
             }
         }
+        crate::codec::encode_document(&result)?;
     }
-    crate::codec::encode_document(&result)?;
     Ok(result)
 }
 

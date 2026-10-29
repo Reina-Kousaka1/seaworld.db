@@ -1040,11 +1040,12 @@ impl Database {
         query: &Query,
         projection: &crate::Projection,
     ) -> Result<Vec<crate::ProjectedRow>> {
-        Ok(self
+        let mut budget = crate::query::MAX_PROJECTED_BYTES;
+        self
             .execute(query)?
             .into_iter()
-            .map(|row| projection.apply(row.id, row.document))
-            .collect())
+            .map(|row| projection.apply_bounded(row.id, row.document, &mut budget))
+            .collect()
     }
 
     /// Applies operations to the first matching document in one transaction.
