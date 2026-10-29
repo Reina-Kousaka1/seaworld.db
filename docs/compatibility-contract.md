@@ -59,22 +59,27 @@ details and limitations.
 
 ### V1-BLOCKER
 
-- Qualify the new public result, transaction, error and capability contract on
-  every supported platform and preserve it through a stated compatibility
-  window. `PublicQueryRow` is backend-neutral and `ErrorCode` is non-exhaustive;
-  see [the public API contract](public-api.md). Request IDs do not imply
-  deduplication.
-- Qualify generated document mutations and differential indexed queries across
-  reopen, snapshots, failure, recovery and compatibility fixtures; expand fuzz
-  and process-crash coverage beyond the present tests.
-- Keep the Linux/Windows CI qualification and conservative filesystem/durability
-  boundary current as release evidence; ARM64 and other platforms remain
-  unqualified until separately tested. Preserve the migration compatibility gate.
+- Freeze the public Rust contract and package/API version for the intended V1
+  candidate, then run this release gate again against that frozen candidate.
+  `PublicQueryRow` is backend-neutral and `ErrorCode` is non-exhaustive; see
+  [the public API contract](public-api.md). Request IDs do not imply
+  deduplication. This is a deliberate release decision, not an automatic version
+  bump or publication.
+
+The present Linux/Windows release gate includes generated document and recovery
+inputs, V1--V4 plus Java-V1 compatibility fixtures, indexed/full-scan
+differentials, snapshots, backup/restore, compaction, and bounded semantic
+process-crash cases for composite mutations. Those cases close the current
+parser/recovery fuzzing and composite-crash technical qualification item; they
+do not prove power-loss durability or exhaustive malformed-input coverage.
 
 ### POST-V1
 
 - Additional drivers and a transport service, subject to their own security and
   deployment review; they are not required by the current embedded contract.
+- Dedicated libFuzzer targets and broader long-running adversarial input and
+  filesystem/power-loss qualification remain defense-in-depth work, not a
+  condition of the current bounded release gate.
 
 ### ARCHITECTURE DECISION
 

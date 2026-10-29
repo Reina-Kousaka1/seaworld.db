@@ -33,28 +33,25 @@ atomically to the write, a defined retention window and behavior for retries
 after an uncertain commit. A request ID alone is not idempotency. Do not promise
 exactly-once delivery or automatic retries. REST, sockets and FFI remain open.
 
-## V1 blockers to resolve
+## V1 release-freeze prerequisite
 
-- Qualify the documented public API contract, stable error categories,
-  lifecycle, compatibility policy and operational limits across supported
-  platforms and a defined compatibility period. The foundation deliberately has
-  no stable foreign-language ABI or transport yet.
-- Expand deterministic and generated isolation, corruption, concurrency,
-  migration and process-crash coverage; add fuzzing and a supported-platform
-  qualification strategy. Process-kill tests alone do not prove power-loss
-  durability. Establish the actual filesystem and hardware assumptions.
-- Decide a supported document query/update contract, including missing versus
-  null, arrays, projections, field updates and atomic bulk behavior; implement
-  and differentially test the chosen semantics with indexes and snapshots.
-- Establish a documented recovery, backup, restore and upgrade policy with
-  verified V1–V4 and Java V1 compatibility and explicit migration.
-- Review resource ceilings and security before any production-readiness claim.
+The technical qualification gate currently covers the documented document,
+query, update, transaction, recovery, backup/restore, migration, limit and
+platform contracts. It includes bounded generated malformed database/recovery
+inputs and process-kill cases for composite document operations. It does not
+claim exhaustive fuzzing or power-loss qualification.
+
+Before declaring a V1 candidate, the owner must deliberately freeze the public
+Rust contract and package/API version, then repeat the Linux/Windows release
+gate against that frozen candidate. This is the remaining V1 release step; it
+does not require a transport, foreign-language ABI, or a WiredTiger backend.
 
 ## Post-V1 candidates
 
 Multikey, text and compound indexes, expanded SQL, in-memory storage, additional
 drivers and network service can be considered separately; they are not implied
-by the current crate. Their priority depends on the eventual V1 contract.
+by the current crate. Dedicated libFuzzer and broader storage/power-loss
+qualification are defense-in-depth work after the bounded release gate.
 
 ## Architecture decisions
 

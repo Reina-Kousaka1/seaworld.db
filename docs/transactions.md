@@ -29,7 +29,7 @@ V4 page records and root publications are staged with ordinary document operatio
 
 Replay applies only complete committed transactions. It validates transaction ID ordering, begin/operation/commit ordering, each record sequence and checksum, and operation semantics. A valid but uncommitted transaction at EOF is discarded from its begin offset. A torn final record also discards the whole containing transaction. Recovery reports all discarded bytes and syncs the truncation. A complete record with a bad checksum or invalid transaction state fails open; recovery never skips it. Reopening after recovery is idempotent.
 
-The process crash harness covers before begin, after begin, a partial first operation, between operations, after the last operation, partial commit markers, V4 page/root-publication boundaries, after commit write before sync, after sync, and interruption during recovery. Process-kill tests do not simulate power loss or device-cache loss.
+The process crash harness covers before begin, after begin, a partial first operation, between operations, after the last operation, partial commit markers, V4 page/root-publication boundaries, after commit write before sync, after sync, and interruption during recovery. Its composite-operation cases exercise `update_many`, `delete_many`, `upsert_one`, and mixed insert/update/delete batches at the transaction boundaries. Recovery must expose either the complete preceding state or complete committed state, never a partial bulk result; indexed and forced-full-scan results are compared after reopen. Process-kill tests do not simulate power loss or device-cache loss.
 
 ## Durability limits
 
