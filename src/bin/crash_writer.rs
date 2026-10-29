@@ -13,7 +13,9 @@ fn path(value: &str) -> FieldPath {
 fn main() {
     let mut arguments = env::args_os().skip(1);
     let Some(database_path) = arguments.next().map(PathBuf::from) else {
-        eprintln!("usage: crash_writer <database-path> [--recover|--backup TARGET|--bulk-update|--bulk-delete|--upsert|--mixed-transaction]");
+        eprintln!(
+            "usage: crash_writer <database-path> [--recover|--backup TARGET|--bulk-update|--bulk-delete|--upsert|--mixed-transaction]"
+        );
         process::exit(2);
     };
     let mode = arguments.next();
@@ -64,7 +66,10 @@ fn main() {
                         value: Value::Integer(2),
                     },
                 ),
-                &[DocumentOperation::Increment(path("score"), Value::Integer(10))],
+                &[DocumentOperation::Increment(
+                    path("score"),
+                    Value::Integer(10),
+                )],
             )
             .map(|_| ()),
         Some("--bulk-delete") => database

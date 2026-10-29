@@ -91,7 +91,10 @@ fn checksummed_semantic_transaction_corruption_fails_closed() {
         let bytes = fs::read(&temp.0).unwrap();
         let outcome = std::panic::catch_unwind(|| Database::open(&temp.0));
         assert!(outcome.is_ok(), "{name} panicked");
-        assert!(matches!(outcome.unwrap(), Err(Error::Integrity(_)) | Err(Error::Format(_))));
+        assert!(matches!(
+            outcome.unwrap(),
+            Err(Error::Integrity(_)) | Err(Error::Format(_))
+        ));
         assert_eq!(fs::read(&temp.0).unwrap(), bytes, "{name} modified input");
     }
 }

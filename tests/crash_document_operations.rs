@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #![forbid(unsafe_code)]
-
 #![cfg(feature = "crash-test")]
 
 use std::{
@@ -130,7 +129,10 @@ fn assert_index_matches_full_scan(database: &Database) {
             value: Value::Integer(value),
         };
         let indexed = Query::new("users", filter.clone());
-        let scan = Query::new("users", Filter::Not(Box::new(Filter::Not(Box::new(filter)))));
+        let scan = Query::new(
+            "users",
+            Filter::Not(Box::new(Filter::Not(Box::new(filter)))),
+        );
         let indexed_ids = database
             .execute(&indexed)
             .unwrap()
@@ -181,7 +183,11 @@ fn document_operations_crash_only_publish_whole_committed_states() {
             let snapshot = Database::open_reader(&temp.path).unwrap();
             let before = rows(&snapshot);
             crash_mode(&temp, mode, point);
-            assert_eq!(rows(&snapshot), before, "{mode} changed fixed reader at {point}");
+            assert_eq!(
+                rows(&snapshot),
+                before,
+                "{mode} changed fixed reader at {point}"
+            );
             snapshot.close().unwrap();
 
             let mut recovered = Database::open(&temp.path).unwrap();
@@ -199,7 +205,11 @@ fn document_operations_crash_only_publish_whole_committed_states() {
             recovered.close().unwrap();
 
             let reopened = Database::open_reader(&temp.path).unwrap();
-            assert_eq!(rows(&reopened), actual, "{mode} changed after reopen at {point}");
+            assert_eq!(
+                rows(&reopened),
+                actual,
+                "{mode} changed after reopen at {point}"
+            );
             assert_index_matches_full_scan(&reopened);
         }
     }
