@@ -1,8 +1,19 @@
 # Compatibility contract and release gate
 
-This describes the present experimental contract and conditions for a future
-stable V1 release. It does not declare V1 ready or promise compatibility for
-unstated formats, APIs, hardware, or filesystems.
+This is the SeaWorld V1 compatibility contract. It freezes the supported
+package/API surface and documents the on-disk, platform, and durability
+boundaries. It does not promise compatibility for unstated formats, APIs,
+hardware, or filesystems.
+
+## Version spaces
+
+- **Package:** `seaworld-db` 1.0.0 is the first stable Rust package release.
+- **Public API:** API 1.0.0 is the backend-neutral Rust client contract described
+  in [the public API](public-api.md). Compatible API additions use a later 1.x
+  version; breaking changes require API 2.0.0.
+- **On disk:** V4 is the current file format. V1--V4 remain readable; format
+  version changes follow the explicit migration/feature-flag rules below and do
+  not track package or API version automatically.
 
 ## Format compatibility
 
@@ -59,12 +70,10 @@ details and limitations.
 
 ### V1-BLOCKER
 
-- Freeze the public Rust contract and package/API version for the intended V1
-  candidate, then run this release gate again against that frozen candidate.
-  `PublicQueryRow` is backend-neutral and `ErrorCode` is non-exhaustive; see
-  [the public API contract](public-api.md). Request IDs do not imply
-  deduplication. This is a deliberate release decision, not an automatic version
-  bump or publication.
+None known. Package version 1.0.0 and API version 1.0.0 freeze the documented
+Rust contract. `PublicQueryRow` is backend-neutral and `ErrorCode` is
+non-exhaustive; request IDs do not imply deduplication. A Git tag and GitHub
+release are deliberately separate owner actions and have not been created here.
 
 The present Linux/Windows release gate includes generated document and recovery
 inputs, V1--V4 plus Java-V1 compatibility fixtures, indexed/full-scan

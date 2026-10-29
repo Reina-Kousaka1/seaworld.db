@@ -1,14 +1,39 @@
-# Public API foundation contract
+# Public API V1 contract
 
-This document describes the current transport-neutral Rust foundation. It is
-not a network protocol, a foreign-function ABI, or a promise that SeaWorld has
-released V1. It deliberately hides the append log, B+Tree pages, index entries,
-borrowed executor rows, cursors, and file handles so a future backend can meet
-the same public contract.
+This document freezes the transport-neutral SeaWorld Rust API at **API version
+1.0.0**. It is not a network protocol or a foreign-function ABI. It deliberately
+hides the append log, B+Tree pages, index entries, borrowed executor rows,
+cursors, and file handles so a future backend can meet the same public contract.
+
+Package version, API version, and on-disk version are separate version spaces.
+The initial V1 package and API version are both `1.0.0`; new databases use
+on-disk format V4 while V1--V3 remain readable. Equal initial package/API
+numbers do not require them to change together in the future.
+
+## Frozen public surface
+
+The backend-neutral client boundary consists of `PublicEngine`,
+`PublicTransaction`, `ApiInfo`, `Capabilities`, `EngineHealth`, `RequestId`,
+`OperationContext`, `PublicQueryRow`, `PublicRowValue`, `ErrorCode`, and
+`API_VERSION`. Its input and result values use the documented public document
+and query types: `Document`, `Value`, `DocumentId`, `CollectionId`,
+`FieldPath`, `Query`, `Filter`, `Projection`, `DocumentOperation`, and their
+documented limit constants. `Database`, `Transaction`, `Snapshot`, SQL and
+administration types remain supported native embedded-library APIs, but are not
+the backend-neutral driver contract.
+
+Public V1 methods preserve their documented signatures and semantics throughout
+API major version 1. Additive methods, optional capability names, error codes,
+and non-exhaustive result fields may be introduced only in a later compatible
+API release with documentation and tests. Removing or renaming a method or
+capability, changing a stable error-code meaning, changing documented query or
+row semantics, or changing required input/output meaning is breaking and needs
+API major version 2. `Document` and `Value` remain the documented fixed V1
+value algebra; a new value variant is a breaking change.
 
 ## Lifecycle and metadata
 
-`PublicEngine::api_info` returns the public foundation version and an explicit
+`PublicEngine::api_info` returns the public API version and an explicit
 capability descriptor. `health` reports an already-open engine as `Ready`; an
 owned trait object can be closed explicitly with `close`. Open, recovery, and
 validation errors are returned before an engine exists. A driver must not infer
@@ -53,31 +78,63 @@ provides `update_one`, `update_many`, `delete_one`, `delete_many`, and
 base document after field operations. It never derives inserted fields from the
 filter.
 
-## Errors and capability evolution
+## Stable errors
 
 `Error::code()` produces a stable machine-readable category; callers must not
-parse human-readable text. The code set distinguishes invalid arguments,
-resource limits, not-found, lock/conflict states, unique constraints,
-transaction conflicts and states, unsupported operations and capabilities,
-unknown format versions, incompatible required features, corrupt format,
-integrity failures, recovery requirements, I/O, and internal invariants.
-Unknown/newer file versions are `unknown_format_version`, not corruption.
+parse human-readable text. `Error` carries Rust-local diagnostics and its
+variant payloads, source errors, and display text are not a machine contract.
+`ErrorCode` is non-exhaustive: a newer code must follow the caller's fallback
+path rather than being parsed or treated as a known code.
 
-`ErrorCode`, `Capabilities`, `ApiInfo`, `EngineHealth`, and `PublicRowValue` are
-marked non-exhaustive where callers might otherwise rely on an exhaustive Rust
-match or literal. New codes can be additive in a later foundation version;
-consumers must include a fallback path. Capability names
-are lowercase ASCII with underscores. `Capabilities::supports` returns `Some`
-for every known name (including known unsupported features) and `None` for an
-unknown future name. Older clients must preserve that distinction and must not
-interpret `None` as false.
+| Stable code | Meaning |
+| --- | --- |
+| `io` | I/O or OS-provided randomness failure. |
+| `locked`, `read_only` | Handle or writer access state prevents the operation. |
+| `recovery_required` | Writable recovery is required before a read-only open. |
+| `corrupt_format`, `integrity_failure` | Malformed bytes or a failed semantic/checksum invariant. |
+| `invalid_argument`, `malformed_document`, `resource_limit` | Caller input or a documented bound is invalid. |
+| `not_found`, `conflict`, `unique_constraint` | Requested state or a constraint prevents the operation. |
+| `transaction_conflict`, `transaction_state` | Snapshot/transaction lifecycle state prevents the operation. |
+| `unsupported_operation`, `unsupported_capability` | The requested documented operation or capability is unavailable. |
+| `incompatible_format`, `unknown_format_version` | Required feature incompatibility or an unknown newer file version. |
+| `backend_unavailable`, `internal_invariant` | Backend availability or an internal invariant failure. |
+
+Unknown/newer file versions are `unknown_format_version`, not corruption.
+The table freezes the category names and meanings; a category that no current
+embedded path emits is reserved for a conforming future backend rather than a
+promise that every operation can return it today.
+
+## Capability contract
+
+V1 guarantees these known capability names and values for the embedded engine:
+
+| Name | V1 value | Meaning |
+| --- | --- | --- |
+| `native_queries` | supported | Typed native query/filter API. |
+| `projections` | supported | Owned document-aware projections. |
+| `array_contains` | supported | Direct array-element query semantics. |
+| `field_updates` | supported | Set, unset, increment and decrement operations. |
+| `transactions` | supported | V2--V4 transaction APIs under the documented one-writer model. |
+| `durable_request_deduplication` | unsupported | Request IDs are correlation only, not idempotency keys. |
+
+`Capabilities::supports` returns `Some(true)` or `Some(false)` for these known
+names and `None` for an unknown future name. Clients must preserve `None` as
+unknown; it is neither support nor a format error. Future capability names are
+lowercase ASCII with underscores and are additive only.
+
+## Error and capability evolution
+
+`Error`, `ErrorCode`, `Capabilities`, `ApiInfo`, `EngineHealth`,
+`PublicQueryRow`, and `PublicRowValue` are marked non-exhaustive where callers
+might otherwise rely on an exhaustive Rust match or literal. New codes can be
+additive in a later API version; consumers must include a fallback path.
 
 Additive methods, result fields, error codes, and capabilities require a public
-foundation-version update and tests. Renaming/removing a capability, changing a
+API-version update and tests. Renaming/removing a capability, changing a
 stable error-code meaning, silently changing result semantics, or changing a
 file format without a new version/required feature is a breaking change.
-Deprecation must retain the old behavior through the stated compatibility
-period; no such deprecation is active today.
+Deprecation must retain the old behavior throughout API major version 1; no
+deprecation is active today.
 
 ## Backend and format boundary
 

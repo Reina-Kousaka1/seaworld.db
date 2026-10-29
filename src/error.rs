@@ -3,6 +3,7 @@ use std::{fmt, io};
 
 /// Errors returned by SeaWorld's parser, storage, and database API.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     Io(io::Error),
     Randomness(getrandom::Error),

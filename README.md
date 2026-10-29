@@ -1,6 +1,9 @@
 # SeaWorld DB
 
-> **Experimental database engine.** SeaWorld DB is an experiment in building an independent, document-native database engine with a planned SQL compatibility layer. It is not production-ready.
+> **V1 embedded database engine.** SeaWorld DB is an independent,
+> document-native database engine with a documented V1 Rust API contract and a
+> deliberately limited SQL compatibility layer. V1 does not claim production
+> readiness for every workload or universal power-loss durability.
 
 SeaWorld DB is a standalone project, independent of Tyvera, Tori, and Noélia. It has no language-runtime dependency and is intended to serve Java, Rust, Python, JavaScript/TypeScript, Tyvera, and other applications through future connectors.
 
@@ -23,8 +26,8 @@ The B+Tree currently supports scalar single-field keys. Old copy-on-write pages 
 
 SeaWorld does not claim production readiness, full ACID compliance, complete SQL compatibility, distribution, or production security. Process-kill tests do not prove power-loss durability. CRC32C checks detect accidental corruption; they do not authenticate a file.
 
-The [compatibility contract and V1 release gate](docs/compatibility-contract.md) describe supported formats, limits, durability boundaries, and remaining release blockers.
-The transport-neutral [public API foundation contract](docs/public-api.md)
+The [compatibility contract and V1 release gate](docs/compatibility-contract.md) describe supported formats, package/API compatibility, limits, and durability boundaries.
+The transport-neutral [public API V1 contract](docs/public-api.md)
 defines owned query results, correlation IDs, error codes, capabilities, and
 the boundary a future backend must preserve.
 The [platform and durability qualification](docs/platform-support.md) records

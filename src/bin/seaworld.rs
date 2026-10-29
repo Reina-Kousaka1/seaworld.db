@@ -70,7 +70,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
 fn shell(path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let mut database = open_or_create(&path)?;
-    println!("SeaWorld DB 0.0.1-dev (experimental)");
+    println!("SeaWorld DB {} (embedded)", env!("CARGO_PKG_VERSION"));
     println!("Type .help for commands; SQL support is a documented subset.");
     let stdin = io::stdin();
     let mut input = String::new();
@@ -240,7 +240,7 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 fn print_usage() {
-    println!("SeaWorld DB experimental embedded database");
+    println!("SeaWorld DB embedded database");
     println!("Usage:");
     println!("  seaworld DATABASE.seaworld.db");
     println!("  seaworld check DATABASE.seaworld.db");

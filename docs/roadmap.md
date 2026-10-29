@@ -1,6 +1,9 @@
 # Roadmap
 
-SeaWorld DB is versioned as `0.0.x` while the file format, recovery, and API are experimental. No `1.0` stability claim is planned until the storage format and recovery behavior are sufficiently tested and documented.
+SeaWorld DB's package and public Rust API are frozen at `1.0.0`. The supported
+on-disk compatibility window is V1--V4, with V4 used for newly created
+databases. This does not extend the documented power-loss, platform, SQL, or
+distributed-system guarantees.
 
 ## Phase 0: repository and foundation
 
@@ -60,7 +63,8 @@ SeaWorld DB is versioned as `0.0.x` while the file format, recovery, and API are
 
 ## Next engine wave
 
-1. Fuzz malformed headers, record streams, transaction state machines, and nested document decoders.
+1. Add dedicated fuzzing targets and a corpus for malformed headers, record
+   streams, transaction state machines, and nested document decoders.
 2. Extend SQL V0 with index DDL and broader prepared-query ergonomics; add migration inspection to the CLI.
 3. Add a true memory backend and test it against the same transaction/query semantics.
 4. Expand concurrency and corruption stress coverage for B+Tree roots, snapshot history, lock contention, compaction, and recovery.

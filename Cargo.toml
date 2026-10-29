@@ -1,10 +1,10 @@
 [package]
 name = "seaworld-db"
-version = "0.0.1-dev"
+version = "1.0.0"
 edition = "2024"
 rust-version = "1.89"
 license = "AGPL-3.0-only"
-description = "Experimental embedded document database engine"
+description = "Embedded document database engine"
 
 [dependencies]
 getrandom = "0.4.3"

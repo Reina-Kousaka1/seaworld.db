@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Transport-neutral, backend-neutral public API foundation.
+//! Transport-neutral, backend-neutral public API V1.
 //!
 //! This module owns only application-visible semantics. It does not expose
 //! storage pages, cursors, indexes, borrowed executor rows, or file handles.
@@ -10,8 +10,8 @@ use crate::{
     ProjectedRow, Projection, Query, Result, Transaction, Value,
 };
 
-/// Version of the transport-neutral SeaWorld API foundation, not the file format.
-pub const API_VERSION: &str = "0.1";
+/// Version of the transport-neutral SeaWorld API, not the package or file format.
+pub const API_VERSION: &str = "1.0.0";
 
 /// An application-supplied correlation ID. It does not provide deduplication.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -116,6 +116,7 @@ pub enum EngineHealth {
 /// contains only requested, present paths; an absent key means missing and a
 /// `Value::Null` value means explicit null. An empty map is a valid projection.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct PublicQueryRow {
     pub id: DocumentId,
     pub value: PublicRowValue,
@@ -184,7 +185,7 @@ pub trait PublicEngine {
     ) -> Result<Vec<PublicQueryRow>>;
     fn update_one(&mut self, query: &Query, operations: &[DocumentOperation]) -> Result<usize>;
     fn update_many(&mut self, query: &Query, operations: &[DocumentOperation]) -> Result<usize>;
-    /// Compatibility spelling for `update_many` in the API-foundation period.
+    /// Stable compatibility spelling for `update_many`.
     fn update(&mut self, query: &Query, operations: &[DocumentOperation]) -> Result<usize> {
         self.update_many(query, operations)
     }
@@ -196,7 +197,7 @@ pub trait PublicEngine {
     ) -> Result<(DocumentId, bool)>;
     fn delete_one(&mut self, query: &Query) -> Result<usize>;
     fn delete_many(&mut self, query: &Query) -> Result<usize>;
-    /// Compatibility spelling for `delete_many` in the API-foundation period.
+    /// Stable compatibility spelling for `delete_many`.
     fn delete(&mut self, query: &Query) -> Result<usize> {
         self.delete_many(query)
     }

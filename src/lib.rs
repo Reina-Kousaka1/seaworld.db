@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #![forbid(unsafe_code)]
-//! Experimental embedded SeaWorld DB engine.
+//! SeaWorld DB V1 embedded document database engine.
 //!
 //! The public API and the planned SQL adapter share one document-native engine. The
 //! V1/V2/V3 files remain readable; new databases use V4 persistent index pages.

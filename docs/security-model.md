@@ -1,6 +1,9 @@
 # Security model and threat boundaries
 
-SeaWorld DB is an experimental embedded engine. Its current validation reduces common parser and corruption risks, but it is not a hardened boundary for untrusted multi-user workloads. CRC32C detects accidental damage; it does not authenticate data or protect against intentional edits.
+SeaWorld DB V1 is an embedded engine. Its current validation reduces common
+parser and corruption risks, but it is not a hardened boundary for untrusted
+multi-user workloads. CRC32C detects accidental damage; it does not authenticate
+data or protect against intentional edits.
 
 ## Assets and trust boundaries
 
