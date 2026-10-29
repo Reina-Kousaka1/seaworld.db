@@ -280,18 +280,41 @@ fn upsert_uses_explicit_insert_base_and_existing_match() {
     let mut db = Database::create(&temp.0).unwrap();
     db.create_collection("items").unwrap();
     let path = FieldPath::parse("key").unwrap();
-    let query = Query::new("items", Filter::Compare {
-        path,
-        op: seaworld_db::CompareOp::Eq,
-        value: Value::String("x".into()),
-    });
-    let operations = [DocumentOperation::Increment(FieldPath::parse("n").unwrap(), Value::Integer(1))];
+    let query = Query::new(
+        "items",
+        Filter::Compare {
+            path,
+            op: seaworld_db::CompareOp::Eq,
+            value: Value::String("x".into()),
+        },
+    );
+    let operations = [DocumentOperation::Increment(
+        FieldPath::parse("n").unwrap(),
+        Value::Integer(1),
+    )];
     let base = Document::empty().with("key", Value::String("x".into()));
     let (id, inserted) = db.upsert_one(&query, base.clone(), &operations).unwrap();
     assert!(inserted);
-    assert_eq!(db.upsert_one(&query, base, &operations).unwrap(), (id, false));
-    assert_eq!(db.get("items", id).unwrap().unwrap().get("n"), Some(&Value::Integer(2)));
-    assert!(db.upsert_one(&query.clone().limit(0), Document::empty(), &operations).is_err());
+    assert_eq!(
+        db.upsert_one(&query, base, &operations).unwrap(),
+        (id, false)
+    );
+    assert_eq!(
+        db.get("items", id).unwrap().unwrap().get("n"),
+        Some(&Value::Integer(2))
+    );
+    assert!(
+        db.upsert_one(&query.clone().limit(0), Document::empty(), &operations)
+            .is_err()
+    );
     db.close().unwrap();
-    assert_eq!(Database::open_reader(&temp.0).unwrap().get("items", id).unwrap().unwrap().get("n"), Some(&Value::Integer(2)));
+    assert_eq!(
+        Database::open_reader(&temp.0)
+            .unwrap()
+            .get("items", id)
+            .unwrap()
+            .unwrap()
+            .get("n"),
+        Some(&Value::Integer(2))
+    );
 }

@@ -1069,7 +1069,10 @@ impl Database {
         if query.limit == 0 {
             return Err(Error::Query("upsert requires a nonzero query limit".into()));
         }
-        let first = self.execute(&query.clone().limit(1))?.first().map(|row| row.id);
+        let first = self
+            .execute(&query.clone().limit(1))?
+            .first()
+            .map(|row| row.id);
         let mut transaction = self.begin_transaction()?;
         let result = if let Some(id) = first {
             transaction.update_fields(query.collection(), id, operations)?;
