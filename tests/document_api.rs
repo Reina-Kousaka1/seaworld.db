@@ -7,7 +7,8 @@ use std::{
 };
 
 use seaworld_db::{
-    Database, Document, DocumentOperation, Error, FieldPath, Filter, MAX_PROJECTION_FIELDS, Projection, Query, Value,
+    Database, Document, DocumentOperation, Error, FieldPath, Filter, MAX_PROJECTION_FIELDS,
+    Projection, Query, Value,
 };
 
 static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(1);
@@ -151,8 +152,8 @@ fn field_updates_are_atomic_and_indexed_across_reopen() {
     )
     .unwrap();
     let before_error = tx.get("items", id).unwrap().unwrap().clone();
-    assert!(tx
-        .update_fields(
+    assert!(
+        tx.update_fields(
             "items",
             id,
             &[
@@ -160,7 +161,8 @@ fn field_updates_are_atomic_and_indexed_across_reopen() {
                 DocumentOperation::Increment(count.clone(), Value::Integer(i64::MAX)),
             ],
         )
-        .is_err());
+        .is_err()
+    );
     assert_eq!(tx.get("items", id).unwrap(), Some(&before_error));
     tx.commit().unwrap();
     let query = Query::new(

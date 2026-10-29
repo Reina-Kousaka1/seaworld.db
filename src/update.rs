@@ -46,7 +46,9 @@ pub fn apply_document_operations(
                     break;
                 }
                 Some(_) => {
-                    return Err(Error::InvalidInput("update path traverses a non-object".into()));
+                    return Err(Error::InvalidInput(
+                        "update path traverses a non-object".into(),
+                    ));
                 }
             }
         }
@@ -63,25 +65,50 @@ pub fn apply_document_operations(
             DocumentOperation::Increment(_, amount) | DocumentOperation::Decrement(_, amount) => {
                 let subtract = matches!(operation, DocumentOperation::Decrement(..));
                 let current = fields.get(last);
-                let value = match (current, amount) {
-                    (None, Value::Integer(amount)) => {
-                        let value = if subtract { 0_i64.checked_sub(*amount) } else { Some(*amount) };
-                        Value::Integer(value.ok_or_else(|| Error::InvalidInput("integer update overflow".into()))?)
-                    }
-                    (Some(Value::Integer(current)), Value::Integer(amount)) => {
-                        let value = if subtract { current.checked_sub(*amount) } else { current.checked_add(*amount) };
-                        Value::Integer(value.ok_or_else(|| Error::InvalidInput("integer update overflow".into()))?)
-                    }
-                    (current, Value::Float(amount)) if amount.is_finite() => {
-                        let base = match current {
-                            None => 0.0,
-                            Some(Value::Float(value)) => *value,
-                            _ => return Err(Error::InvalidInput("numeric update type mismatch".into())),
-                        };
-                        Value::floating(if subtract { base - amount } else { base + amount })?
-                    }
-                    _ => return Err(Error::InvalidInput("numeric update requires matching numeric types".into())),
-                };
+                let value =
+                    match (current, amount) {
+                        (None, Value::Integer(amount)) => {
+                            let value = if subtract {
+                                0_i64.checked_sub(*amount)
+                            } else {
+                                Some(*amount)
+                            };
+                            Value::Integer(value.ok_or_else(|| {
+                                Error::InvalidInput("integer update overflow".into())
+                            })?)
+                        }
+                        (Some(Value::Integer(current)), Value::Integer(amount)) => {
+                            let value = if subtract {
+                                current.checked_sub(*amount)
+                            } else {
+                                current.checked_add(*amount)
+                            };
+                            Value::Integer(value.ok_or_else(|| {
+                                Error::InvalidInput("integer update overflow".into())
+                            })?)
+                        }
+                        (current, Value::Float(amount)) if amount.is_finite() => {
+                            let base = match current {
+                                None => 0.0,
+                                Some(Value::Float(value)) => *value,
+                                _ => {
+                                    return Err(Error::InvalidInput(
+                                        "numeric update type mismatch".into(),
+                                    ));
+                                }
+                            };
+                            Value::floating(if subtract {
+                                base - amount
+                            } else {
+                                base + amount
+                            })?
+                        }
+                        _ => {
+                            return Err(Error::InvalidInput(
+                                "numeric update requires matching numeric types".into(),
+                            ));
+                        }
+                    };
                 fields.insert(last.clone(), value);
             }
         }
