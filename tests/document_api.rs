@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #![forbid(unsafe_code)]
 use std::{
+    collections::BTreeMap,
     fs,
     path::PathBuf,
     sync::atomic::{AtomicU64, Ordering},
@@ -507,5 +508,122 @@ proptest::proptest! {
         db.close().unwrap();
         let db = Database::open_reader(&temp.0).unwrap();
         proptest::prop_assert_eq!(rows(&db, &indexed), rows(&db, &scan));
+    }
+
+    #[test]
+    fn generated_document_bulk_upserts_match_a_small_reference_model(
+        steps in proptest::collection::vec((0u8..7, 0i64..4, -8i64..9), 0..24)
+    ) {
+        let temp = TempDatabase::new();
+        let mut db = Database::create(&temp.0).unwrap();
+        db.create_collection("items").unwrap();
+        let make_document = |group: i64, value: i64, tagged: bool| {
+            Document::empty()
+                .with("group", Value::Integer(group))
+                .with("n", Value::Integer(value))
+                .with("tags", Value::Array(if tagged { vec![Value::String("a".into())] } else { Vec::new() }))
+        };
+        let mut model = BTreeMap::new();
+        for (group, value, tagged) in [(0, 0, true), (1, 1, false), (2, 2, true)] {
+            let id = db.insert("items", make_document(group, value, tagged)).unwrap();
+            model.insert(id.value(), make_document(group, value, tagged));
+        }
+        db.create_index("items", "group").unwrap();
+        let snapshot = db.begin_read().unwrap();
+        let initial = snapshot.execute(&Query::new("items", Filter::All)).unwrap();
+        let group_path = FieldPath::parse("group").unwrap();
+        let n_path = FieldPath::parse("n").unwrap();
+        let tags_path = FieldPath::parse("tags").unwrap();
+        let rows = |database: &Database| {
+            database.execute(&Query::new("items", Filter::All)).unwrap().into_iter()
+                .map(|row| (row.id.value(), (*row.document).clone())).collect::<Vec<_>>()
+        };
+        let model_rows = |state: &BTreeMap<i64, Document>| {
+            state.iter().map(|(id, document)| (*id, document.clone())).collect::<Vec<_>>()
+        };
+        let matches_group = |document: &Document, group: i64, tagged_only: bool| {
+            document.get("group") == Some(&Value::Integer(group))
+                && (!tagged_only || matches!(document.get("tags"), Some(Value::Array(tags)) if tags.contains(&Value::String("a".into()))))
+        };
+
+        for (kind, group, value) in steps {
+            let indexed_filter = Filter::And(vec![
+                Filter::Compare { path: group_path.clone(), op: seaworld_db::CompareOp::Eq, value: Value::Integer(group) },
+                Filter::ArrayContains { path: tags_path.clone(), value: Value::String("a".into()) },
+            ]);
+            let indexed = Query::new("items", indexed_filter.clone());
+            let full_scan = Query::new("items", Filter::Not(Box::new(Filter::Not(Box::new(indexed_filter)))));
+            let indexed_ids = db.execute(&indexed).unwrap().into_iter().map(|row| row.id).collect::<Vec<_>>();
+            let scan_ids = db.execute(&full_scan).unwrap().into_iter().map(|row| row.id).collect::<Vec<_>>();
+            proptest::prop_assert_eq!(indexed_ids, scan_ids);
+
+            match kind {
+                0 => {
+                    let operation = DocumentOperation::Set(n_path.clone(), Value::Integer(value));
+                    let expected_ids = model.iter().filter_map(|(id, document)| matches_group(document, group, true).then_some(*id)).collect::<Vec<_>>();
+                    proptest::prop_assert_eq!(db.update_many(&indexed, &[operation]).unwrap(), expected_ids.len());
+                    for id in expected_ids { let document = model.remove(&id).unwrap().with("n", Value::Integer(value)); model.insert(id, document); }
+                }
+                1 => {
+                    let query = Query::new("items", Filter::Compare { path: group_path.clone(), op: seaworld_db::CompareOp::Eq, value: Value::Integer(group) });
+                    let expected_ids = model.iter().filter_map(|(id, document)| matches_group(document, group, false).then_some(*id)).collect::<Vec<_>>();
+                    proptest::prop_assert_eq!(db.delete_many(&query).unwrap(), expected_ids.len());
+                    for id in expected_ids { model.remove(&id); }
+                }
+                2 => {
+                    let query = Query::new("items", Filter::Compare { path: group_path.clone(), op: seaworld_db::CompareOp::Eq, value: Value::Integer(group) });
+                    let existing = model.iter().find_map(|(id, document)| matches_group(document, group, false).then_some(*id));
+                    let base = make_document(group, 0, true);
+                    let (id, inserted) = db.upsert_one(&query, base.clone(), &[DocumentOperation::Set(n_path.clone(), Value::Integer(value))]).unwrap();
+                    proptest::prop_assert_eq!(inserted, existing.is_none());
+                    proptest::prop_assert_eq!(id.value(), existing.unwrap_or(id.value()));
+                    let document = if inserted { base.with("n", Value::Integer(value)) } else { model.remove(&id.value()).unwrap().with("n", Value::Integer(value)) };
+                    model.insert(id.value(), document);
+                }
+                3 => {
+                    let query = Query::new("items", Filter::Compare { path: group_path.clone(), op: seaworld_db::CompareOp::Eq, value: Value::Integer(group) });
+                    let expected_ids = model.iter().filter_map(|(id, document)| matches_group(document, group, false).then_some(*id)).collect::<Vec<_>>();
+                    let operation = DocumentOperation::Increment(n_path.clone(), Value::Integer(value));
+                    proptest::prop_assert_eq!(db.update_many(&query, &[operation]).unwrap(), expected_ids.len());
+                    for id in expected_ids {
+                        let n = match model.get(&id).unwrap().get("n") {
+                            Some(Value::Integer(n)) => *n,
+                            None => 0,
+                            _ => unreachable!(),
+                        };
+                        let document = model.remove(&id).unwrap().with("n", Value::Integer(n + value));
+                        model.insert(id, document);
+                    }
+                }
+                4 => if let Some(id) = model.keys().next().copied() {
+                    let query = Query::new("items", Filter::IdEq(seaworld_db::DocumentId::new(id).unwrap()));
+                    proptest::prop_assert_eq!(db.update_one(&query, &[DocumentOperation::Unset(n_path.clone())]).unwrap(), 1);
+                    let document = model.remove(&id).unwrap();
+                    let mut fields = document.fields().clone();
+                    fields.remove("n");
+                    model.insert(id, Document::new(fields));
+                },
+                5 => if let Some(id) = model.keys().next().copied() {
+                    let query = Query::new("items", Filter::IdEq(seaworld_db::DocumentId::new(id).unwrap()));
+                    proptest::prop_assert_eq!(db.delete_one(&query).unwrap(), 1);
+                    model.remove(&id);
+                },
+                _ => {
+                    let values = vec![Value::Integer(group), Value::Integer((group + 1) % 4)];
+                    let query = Query::new("items", Filter::in_values(group_path.clone(), values).unwrap());
+                    let expected_ids = model.iter().filter_map(|(id, document)| {
+                        matches_group(document, group, false).then_some(*id).or_else(|| matches_group(document, (group + 1) % 4, false).then_some(*id))
+                    }).collect::<Vec<_>>();
+                    proptest::prop_assert_eq!(db.update_many(&query, &[DocumentOperation::Set(n_path.clone(), Value::Integer(value))]).unwrap(), expected_ids.len());
+                    for id in expected_ids { let document = model.remove(&id).unwrap().with("n", Value::Integer(value)); model.insert(id, document); }
+                }
+            }
+            proptest::prop_assert_eq!(rows(&db), model_rows(&model));
+            proptest::prop_assert_eq!(snapshot.execute(&Query::new("items", Filter::All)).unwrap(), initial);
+        }
+        drop(snapshot);
+        db.close().unwrap();
+        let reopened = Database::open_reader(&temp.0).unwrap();
+        proptest::prop_assert_eq!(rows(&reopened), model_rows(&model));
     }
 }
