@@ -11,9 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use seaworld_db::{
-    CompareOp, Database, Document, Error, FieldPath, Filter, Query, Value,
-};
+use seaworld_db::{CompareOp, Database, Document, Error, FieldPath, Filter, Query, Value};
 
 static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(1);
 
