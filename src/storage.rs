@@ -1053,6 +1053,7 @@ impl Database {
         query: &Query,
         operations: &[crate::DocumentOperation],
     ) -> Result<usize> {
+        self.validate_query(query)?;
         self.update_many(&query.clone().limit(query.limit.min(1)), operations)
     }
 
@@ -1064,6 +1065,7 @@ impl Database {
         operations: &[crate::DocumentOperation],
     ) -> Result<(DocumentId, bool)> {
         self.check_writable()?;
+        self.validate_query(query)?;
         if query.limit == 0 {
             return Err(Error::Query("upsert requires a nonzero query limit".into()));
         }
@@ -1106,6 +1108,7 @@ impl Database {
 
     /// Deletes the first matching document in one transaction.
     pub fn delete_one(&mut self, query: &Query) -> Result<usize> {
+        self.validate_query(query)?;
         self.delete_many(&query.clone().limit(query.limit.min(1)))
     }
 
