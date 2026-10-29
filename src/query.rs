@@ -52,10 +52,14 @@ impl Projection {
                 continue;
             }
             if let Some(value) = path.get(document) {
-                let size = path.segments().iter().try_fold(
-                    crate::codec::encoded_value_len(value)?.saturating_add(128),
-                    |size, segment| size.checked_add(segment.len()),
-                ).ok_or_else(|| Error::Limit("projection size overflow".into()))?;
+                let size = path
+                    .segments()
+                    .iter()
+                    .try_fold(
+                        crate::codec::encoded_value_len(value)?.saturating_add(128),
+                        |size, segment| size.checked_add(segment.len()),
+                    )
+                    .ok_or_else(|| Error::Limit("projection size overflow".into()))?;
                 *budget = budget.checked_sub(size).ok_or_else(|| {
                     Error::Limit("projected query result exceeds its byte limit".into())
                 })?;

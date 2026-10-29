@@ -28,8 +28,9 @@ pub use mvcc::{
     CommitVersion, MAX_ACTIVE_SNAPSHOTS, MAX_MVCC_HISTORY_BYTES, Snapshot, SnapshotRow,
 };
 pub use query::{
-    CompareOp, Filter, MAX_FILTER_DEPTH, MAX_FILTER_NODES, MAX_PROJECTED_BYTES, MAX_PROJECTION_FIELDS,
-    MAX_QUERY_RESULTS, ProjectedRow, Projection, Query, QueryPlan, QueryRow, SortDirection,
+    CompareOp, Filter, MAX_FILTER_DEPTH, MAX_FILTER_NODES, MAX_PROJECTED_BYTES,
+    MAX_PROJECTION_FIELDS, MAX_QUERY_RESULTS, ProjectedRow, Projection, Query, QueryPlan, QueryRow,
+    SortDirection,
 };
 pub use sql::{MAX_SQL_BYTES, MAX_SQL_TOKENS, SqlResult, SqlRow};
 pub use storage::{

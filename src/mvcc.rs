@@ -455,8 +455,7 @@ impl Snapshot {
         projection: &crate::Projection,
     ) -> Result<Vec<crate::ProjectedRow>> {
         let mut budget = crate::query::MAX_PROJECTED_BYTES;
-        self
-            .execute(query)?
+        self.execute(query)?
             .into_iter()
             .map(|row| projection.apply_bounded(row.id, &row.document, &mut budget))
             .collect()

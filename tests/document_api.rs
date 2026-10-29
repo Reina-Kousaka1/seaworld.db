@@ -197,7 +197,10 @@ fn public_api_metadata_and_error_codes_are_transport_neutral() {
     assert!(seaworld_db::RequestId::new("x".repeat(129)).is_err());
     assert_eq!(Error::Locked.code(), seaworld_db::ErrorCode::Locked);
     assert_eq!(Error::Locked.code().as_str(), "locked");
-    assert_eq!(seaworld_db::capabilities().supports("projections"), Some(true));
+    assert_eq!(
+        seaworld_db::capabilities().supports("projections"),
+        Some(true)
+    );
     assert_eq!(seaworld_db::capabilities().supports("unknown"), None);
     assert_eq!(
         Error::Integrity("detail".into()).code(),
@@ -210,18 +213,37 @@ fn unique_conflict_in_bulk_update_does_not_publish_any_change() {
     let temp = TempDatabase::new();
     let mut db = Database::create(&temp.0).unwrap();
     db.create_collection("items").unwrap();
-    let first = db.insert("items", Document::empty().with("key", Value::Integer(1))).unwrap();
-    let second = db.insert("items", Document::empty().with("key", Value::Integer(2))).unwrap();
+    let first = db
+        .insert("items", Document::empty().with("key", Value::Integer(1)))
+        .unwrap();
+    let second = db
+        .insert("items", Document::empty().with("key", Value::Integer(2)))
+        .unwrap();
     db.create_unique_index("items", "key").unwrap();
     let query = Query::new("items", Filter::All);
     let op = DocumentOperation::Set(FieldPath::parse("key").unwrap(), Value::Integer(3));
-    assert!(matches!(db.update_many(&query, &[op]), Err(Error::ConstraintViolation(_))));
-    assert_eq!(db.get("items", first).unwrap().unwrap().get("key"), Some(&Value::Integer(1)));
-    assert_eq!(db.get("items", second).unwrap().unwrap().get("key"), Some(&Value::Integer(2)));
+    assert!(matches!(
+        db.update_many(&query, &[op]),
+        Err(Error::ConstraintViolation(_))
+    ));
+    assert_eq!(
+        db.get("items", first).unwrap().unwrap().get("key"),
+        Some(&Value::Integer(1))
+    );
+    assert_eq!(
+        db.get("items", second).unwrap().unwrap().get("key"),
+        Some(&Value::Integer(2))
+    );
     db.close().unwrap();
     let reopened = Database::open_reader(&temp.0).unwrap();
-    assert_eq!(reopened.get("items", first).unwrap().unwrap().get("key"), Some(&Value::Integer(1)));
-    assert_eq!(reopened.get("items", second).unwrap().unwrap().get("key"), Some(&Value::Integer(2)));
+    assert_eq!(
+        reopened.get("items", first).unwrap().unwrap().get("key"),
+        Some(&Value::Integer(1))
+    );
+    assert_eq!(
+        reopened.get("items", second).unwrap().unwrap().get("key"),
+        Some(&Value::Integer(2))
+    );
 }
 
 #[test]
