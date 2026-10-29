@@ -12,13 +12,13 @@ fn path(value: &str) -> FieldPath {
 
 fn main() {
     let mut arguments = env::args_os().skip(1);
-    let Some(path) = arguments.next().map(PathBuf::from) else {
+    let Some(database_path) = arguments.next().map(PathBuf::from) else {
         eprintln!("usage: crash_writer <database-path> [--recover|--backup TARGET|--bulk-update|--bulk-delete|--upsert|--mixed-transaction]");
         process::exit(2);
     };
     let mode = arguments.next();
     let recovery_mode = mode.as_deref().is_some_and(|value| value == "--recover");
-    let mut database = match Database::open(path) {
+    let mut database = match Database::open(database_path) {
         Ok(database) => database,
         Err(error) => {
             eprintln!("could not open database: {error}");
