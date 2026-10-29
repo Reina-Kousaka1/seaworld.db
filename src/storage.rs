@@ -3246,7 +3246,9 @@ impl<'database> Transaction<'database> {
         let index_batch =
             self.database
                 .commit_transaction(self.id, &self.operations, &self.overlay)?;
-        self.apply_staged_with_index_batch(Some(index_batch))
+        self.apply_staged_with_index_batch(Some(index_batch))?;
+        crash_transaction_at("transaction_after_publish");
+        Ok(())
     }
 
     /// Discards all staged changes. Provisional IDs can be reused after rollback.
