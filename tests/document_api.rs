@@ -9,7 +9,7 @@ use std::{
 
 use seaworld_db::{
     Database, Document, DocumentOperation, EngineHealth, Error, ErrorCode, FieldPath, Filter,
-    MAX_PROJECTION_FIELDS, OperationContext, Projection, PublicRowValue, Query, RequestId, Value,
+    MAX_PROJECTION_FIELDS, OperationContext, Projection, PublicRowValue, Query, Value,
 };
 
 static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(1);
@@ -619,7 +619,10 @@ proptest::proptest! {
                 }
             }
             proptest::prop_assert_eq!(rows(&db), model_rows(&model));
-            proptest::prop_assert_eq!(snapshot.execute(&Query::new("items", Filter::All)).unwrap(), initial);
+            proptest::prop_assert_eq!(
+                snapshot.execute(&Query::new("items", Filter::All)).unwrap(),
+                initial.clone()
+            );
         }
         drop(snapshot);
         db.close().unwrap();
