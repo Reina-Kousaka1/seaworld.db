@@ -46,7 +46,7 @@ fn main() {
         return;
     }
 
-    let result = match mode.as_deref() {
+    let result = match mode.as_deref().and_then(|value| value.to_str()) {
         Some("--update-indexed") => (|| {
             let mut transaction = database.begin_transaction()?;
             transaction.update(

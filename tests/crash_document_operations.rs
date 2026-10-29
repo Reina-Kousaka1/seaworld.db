@@ -12,7 +12,7 @@ use std::{
 };
 
 use seaworld_db::{
-    CompareOp, Database, Document, DocumentId, Error, FieldPath, Filter, Query, Value,
+    CompareOp, Database, Document, Error, FieldPath, Filter, Query, Value,
 };
 
 static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(1);
