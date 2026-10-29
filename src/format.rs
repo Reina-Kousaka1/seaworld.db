@@ -53,9 +53,7 @@ pub(crate) fn decode_header(bytes: &[u8]) -> Result<FileHeader> {
         && version != MVCC_FORMAT_VERSION
         && version != PERSISTENT_INDEX_FORMAT_VERSION
     {
-        return Err(Error::Format(format!(
-            "unsupported format version {version}"
-        )));
+        return Err(Error::UnsupportedFormatVersion(version));
     }
     let header_len = u16::from_be_bytes(bytes[10..12].try_into().expect("fixed header range"));
     if usize::from(header_len) != HEADER_SIZE {
@@ -71,7 +69,9 @@ pub(crate) fn decode_header(bytes: &[u8]) -> Result<FileHeader> {
     }
     let flags = u64::from_be_bytes(bytes[16..24].try_into().expect("fixed header range"));
     if flags != 0 {
-        return Err(Error::Format("unsupported required feature flags".into()));
+        return Err(Error::UnsupportedFeature(
+            "required feature flags are not supported".into(),
+        ));
     }
     if bytes[40..60].iter().any(|byte| *byte != 0) {
         return Err(Error::Format("reserved header bytes must be zero".into()));

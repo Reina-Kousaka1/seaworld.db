@@ -7,8 +7,8 @@ use std::{
 };
 
 use seaworld_db::{
-    Database, Document, DocumentOperation, Error, FieldPath, Filter, MAX_PROJECTION_FIELDS,
-    Projection, Query, Value,
+    Database, Document, DocumentOperation, EngineHealth, Error, ErrorCode, FieldPath, Filter,
+    MAX_PROJECTION_FIELDS, OperationContext, Projection, PublicRowValue, Query, RequestId, Value,
 };
 
 static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(1);
@@ -204,8 +204,18 @@ fn public_api_metadata_and_error_codes_are_transport_neutral() {
     assert_eq!(seaworld_db::capabilities().supports("unknown"), None);
     assert_eq!(
         Error::Integrity("detail".into()).code(),
-        seaworld_db::ErrorCode::Corrupt
+        ErrorCode::IntegrityFailure
     );
+    assert_eq!(
+        Error::UnsupportedFormatVersion(99).code(),
+        ErrorCode::UnknownFormatVersion
+    );
+    assert_eq!(
+        Error::UnsupportedFeature("flag".into()).code(),
+        ErrorCode::IncompatibleFormat
+    );
+    let context = OperationContext::new().with_request_id(request_id);
+    assert_eq!(context.request_id().unwrap().as_str(), "operation-17");
 }
 
 #[test]
@@ -310,6 +320,8 @@ fn public_engine_boundary_uses_the_existing_backend() {
     let temp = TempDatabase::new();
     let mut database = Database::create(&temp.0).unwrap();
     let engine: &mut dyn seaworld_db::PublicEngine = &mut database;
+    assert_eq!(engine.api_info().version, seaworld_db::API_VERSION);
+    assert_eq!(engine.health(), EngineHealth::Ready);
     engine.create_collection("items").unwrap();
     let mut tx = engine.begin().unwrap();
     let id = tx
@@ -328,6 +340,26 @@ fn public_engine_boundary_uses_the_existing_backend() {
         1
     );
     assert!(engine.get("items", id).unwrap().is_some());
+    let projection = Projection::new([
+        FieldPath::parse("name").unwrap(),
+        FieldPath::parse("missing").unwrap(),
+    ])
+    .unwrap();
+    let projected = engine
+        .query_projected(&Query::new("items", Filter::All), &projection)
+        .unwrap();
+    assert_eq!(projected[0].id, id);
+    assert_eq!(projected[0].document_value(), None);
+    let fields = projected[0].projected_fields().unwrap();
+    assert_eq!(
+        fields.get(&FieldPath::parse("name").unwrap()),
+        Some(&Value::String("A".into()))
+    );
+    assert!(!fields.contains_key(&FieldPath::parse("missing").unwrap()));
+    assert!(matches!(&projected[0].value, PublicRowValue::Projection(_)));
+    let rows = engine.query(&Query::new("items", Filter::All)).unwrap();
+    assert!(matches!(&rows[0].value, PublicRowValue::Document(_)));
+    assert_eq!(engine.collection_names().unwrap(), ["items"]);
     assert_eq!(
         engine
             .delete(&Query::new("items", Filter::IdEq(id)))

@@ -638,6 +638,21 @@ fn invalid_magic_is_rejected() {
 }
 
 #[test]
+fn unknown_format_version_is_distinct_from_corruption() {
+    let temp = TempDatabase::new();
+    Database::create(&temp.path).unwrap().close().unwrap();
+    let mut bytes = fs::read(&temp.path).unwrap();
+    bytes[8..10].copy_from_slice(&999_u16.to_be_bytes());
+    let checksum = crc32c(&bytes[..60]);
+    bytes[60..64].copy_from_slice(&checksum.to_be_bytes());
+    fs::write(&temp.path, bytes).unwrap();
+    assert!(matches!(
+        Database::open(&temp.path),
+        Err(Error::UnsupportedFormatVersion(999))
+    ));
+}
+
+#[test]
 fn truncated_header_is_rejected() {
     let temp = TempDatabase::new();
     File::create(&temp.path)

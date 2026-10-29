@@ -19,7 +19,8 @@ mod storage;
 mod update;
 
 pub use api::{
-    API_VERSION, Capabilities, PublicEngine, PublicTransaction, RequestId, capabilities,
+    API_VERSION, ApiInfo, Capabilities, EngineHealth, OperationContext, PublicEngine, PublicQueryRow,
+    PublicRowValue, PublicTransaction, RequestId, capabilities,
 };
 pub use document::{Document, MAX_DOCUMENT_BYTES, Value};
 pub use error::{Error, ErrorCode, Result};

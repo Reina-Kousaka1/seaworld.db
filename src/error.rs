@@ -12,6 +12,8 @@ pub enum Error {
     ActiveSnapshots,
     LockPoisoned,
     Format(String),
+    UnsupportedFormatVersion(u16),
+    UnsupportedFeature(String),
     Integrity(String),
     InvalidInput(String),
     Limit(String),
@@ -29,19 +31,28 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Transport-neutral categories; details remain available on the original error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ErrorCode {
     Io,
     Locked,
     ReadOnly,
     RecoveryRequired,
-    Corrupt,
-    InvalidInput,
+    CorruptFormat,
+    IntegrityFailure,
+    InvalidArgument,
+    MalformedDocument,
     ResourceLimit,
     NotFound,
     Conflict,
-    Unsupported,
-    Transaction,
-    Internal,
+    UniqueConstraint,
+    TransactionConflict,
+    TransactionState,
+    UnsupportedOperation,
+    UnsupportedCapability,
+    IncompatibleFormat,
+    UnknownFormatVersion,
+    BackendUnavailable,
+    InternalInvariant,
 }
 
 impl ErrorCode {
@@ -52,14 +63,22 @@ impl ErrorCode {
             Self::Locked => "locked",
             Self::ReadOnly => "read_only",
             Self::RecoveryRequired => "recovery_required",
-            Self::Corrupt => "corrupt",
-            Self::InvalidInput => "invalid_input",
+            Self::CorruptFormat => "corrupt_format",
+            Self::IntegrityFailure => "integrity_failure",
+            Self::InvalidArgument => "invalid_argument",
+            Self::MalformedDocument => "malformed_document",
             Self::ResourceLimit => "resource_limit",
             Self::NotFound => "not_found",
             Self::Conflict => "conflict",
-            Self::Unsupported => "unsupported",
-            Self::Transaction => "transaction",
-            Self::Internal => "internal",
+            Self::UniqueConstraint => "unique_constraint",
+            Self::TransactionConflict => "transaction_conflict",
+            Self::TransactionState => "transaction_state",
+            Self::UnsupportedOperation => "unsupported_operation",
+            Self::UnsupportedCapability => "unsupported_capability",
+            Self::IncompatibleFormat => "incompatible_format",
+            Self::UnknownFormatVersion => "unknown_format_version",
+            Self::BackendUnavailable => "backend_unavailable",
+            Self::InternalInvariant => "internal_invariant",
         }
     }
 }
@@ -72,14 +91,20 @@ impl Error {
             Self::Locked => ErrorCode::Locked,
             Self::ReadOnly => ErrorCode::ReadOnly,
             Self::RecoveryRequired => ErrorCode::RecoveryRequired,
-            Self::Format(_) | Self::Integrity(_) => ErrorCode::Corrupt,
-            Self::InvalidInput(_) | Self::Query(_) => ErrorCode::InvalidInput,
+            Self::Format(_) => ErrorCode::CorruptFormat,
+            Self::UnsupportedFormatVersion(_) => ErrorCode::UnknownFormatVersion,
+            Self::UnsupportedFeature(_) => ErrorCode::IncompatibleFormat,
+            Self::Integrity(_) => ErrorCode::IntegrityFailure,
+            Self::InvalidInput(_) | Self::Query(_) => ErrorCode::InvalidArgument,
             Self::Limit(_) => ErrorCode::ResourceLimit,
             Self::NotFound(_) => ErrorCode::NotFound,
-            Self::Duplicate(_) | Self::ConstraintViolation(_) => ErrorCode::Conflict,
-            Self::UpgradeRequired(_) | Self::UnsupportedIndexValue(_) => ErrorCode::Unsupported,
-            Self::ActiveSnapshots | Self::TransactionState(_) => ErrorCode::Transaction,
-            Self::LockPoisoned => ErrorCode::Internal,
+            Self::Duplicate(_) => ErrorCode::UniqueConstraint,
+            Self::ConstraintViolation(_) => ErrorCode::Conflict,
+            Self::UpgradeRequired(_) => ErrorCode::IncompatibleFormat,
+            Self::UnsupportedIndexValue(_) => ErrorCode::UnsupportedOperation,
+            Self::ActiveSnapshots => ErrorCode::TransactionConflict,
+            Self::TransactionState(_) => ErrorCode::TransactionState,
+            Self::LockPoisoned => ErrorCode::InternalInvariant,
         }
     }
 }
@@ -99,6 +124,12 @@ impl fmt::Display for Error {
             }
             Self::LockPoisoned => formatter.write_str("database snapshot state is unavailable"),
             Self::Format(message) => write!(formatter, "invalid database format: {message}"),
+            Self::UnsupportedFormatVersion(version) => {
+                write!(formatter, "unsupported database format version: {version}")
+            }
+            Self::UnsupportedFeature(message) => {
+                write!(formatter, "unsupported database feature: {message}")
+            }
             Self::Integrity(message) => write!(formatter, "database integrity error: {message}"),
             Self::InvalidInput(message) => write!(formatter, "invalid input: {message}"),
             Self::Limit(message) => write!(formatter, "database limit exceeded: {message}"),
