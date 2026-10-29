@@ -328,12 +328,34 @@ fn document_operations_survive_backup_restore_and_compaction() {
     let mut db = Database::create(&source.0).unwrap();
     db.create_collection("items").unwrap();
     db.create_index("items", "count").unwrap();
-    let id = db.insert("items", Document::empty().with("tags", Value::Array(vec![Value::String("blue".into())]))).unwrap();
-    db.update_one(&Query::new("items", Filter::IdEq(id)), &[DocumentOperation::Increment(FieldPath::parse("count").unwrap(), Value::Integer(3))]).unwrap();
-    let query = Query::new("items", Filter::And(vec![
-        Filter::Compare { path: FieldPath::parse("count").unwrap(), op: seaworld_db::CompareOp::Eq, value: Value::Integer(3) },
-        Filter::ArrayContains { path: FieldPath::parse("tags").unwrap(), value: Value::String("blue".into()) },
-    ]));
+    let id = db
+        .insert(
+            "items",
+            Document::empty().with("tags", Value::Array(vec![Value::String("blue".into())])),
+        )
+        .unwrap();
+    db.update_one(
+        &Query::new("items", Filter::IdEq(id)),
+        &[DocumentOperation::Increment(
+            FieldPath::parse("count").unwrap(),
+            Value::Integer(3),
+        )],
+    )
+    .unwrap();
+    let query = Query::new(
+        "items",
+        Filter::And(vec![
+            Filter::Compare {
+                path: FieldPath::parse("count").unwrap(),
+                op: seaworld_db::CompareOp::Eq,
+                value: Value::Integer(3),
+            },
+            Filter::ArrayContains {
+                path: FieldPath::parse("tags").unwrap(),
+                value: Value::String("blue".into()),
+            },
+        ]),
+    );
     assert_eq!(db.execute(&query).unwrap()[0].id, id);
     db.backup(&backup.0).unwrap();
     Database::restore_backup(&backup.0, &restored.0).unwrap();
