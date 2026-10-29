@@ -31,30 +31,9 @@ pub fn apply_document_operations(
         let (last, parents) = path.segments().split_last().ok_or_else(|| {
             Error::InvalidInput("document update requires a nonempty path".into())
         })?;
-        let mut fields = result.fields_mut_for_sql();
-        let mut missing = false;
-        for segment in parents {
-            if create {
-                fields
-                    .entry(segment.clone())
-                    .or_insert_with(|| Value::Object(BTreeMap::new()));
-            }
-            match fields.get_mut(segment) {
-                Some(Value::Object(object)) => fields = object,
-                None => {
-                    missing = true;
-                    break;
-                }
-                Some(_) => {
-                    return Err(Error::InvalidInput(
-                        "update path traverses a non-object".into(),
-                    ));
-                }
-            }
-        }
-        if missing {
+        let Some(fields) = parent_fields(result.fields_mut_for_sql(), parents, create)? else {
             continue;
-        }
+        };
         match operation {
             DocumentOperation::Set(_, value) => {
                 fields.insert(last.clone(), value.clone());
@@ -115,4 +94,26 @@ pub fn apply_document_operations(
     }
     crate::codec::encode_document(&result)?;
     Ok(result)
+}
+
+fn parent_fields<'a>(
+    fields: &'a mut BTreeMap<String, Value>,
+    parents: &[String],
+    create: bool,
+) -> Result<Option<&'a mut BTreeMap<String, Value>>> {
+    let Some((segment, rest)) = parents.split_first() else {
+        return Ok(Some(fields));
+    };
+    if create {
+        fields
+            .entry(segment.clone())
+            .or_insert_with(|| Value::Object(BTreeMap::new()));
+    }
+    match fields.get_mut(segment) {
+        Some(Value::Object(object)) => parent_fields(object, rest, create),
+        None => Ok(None),
+        Some(_) => Err(Error::InvalidInput(
+            "update path traverses a non-object".into(),
+        )),
+    }
 }
