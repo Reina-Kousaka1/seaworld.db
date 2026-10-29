@@ -1056,6 +1056,30 @@ impl Database {
         self.update_many(&query.clone().limit(query.limit.min(1)), operations)
     }
 
+    /// Updates the first selected document or inserts an explicit base document.
+    pub fn upsert_one(
+        &mut self,
+        query: &Query,
+        insert_document: Document,
+        operations: &[crate::DocumentOperation],
+    ) -> Result<(DocumentId, bool)> {
+        self.check_writable()?;
+        if query.limit == 0 {
+            return Err(Error::Query("upsert requires a nonzero query limit".into()));
+        }
+        let first = self.execute(&query.clone().limit(1))?.first().map(|row| row.id);
+        let mut transaction = self.begin_transaction()?;
+        let result = if let Some(id) = first {
+            transaction.update_fields(query.collection(), id, operations)?;
+            (id, false)
+        } else {
+            let document = crate::apply_document_operations(&insert_document, operations)?;
+            (transaction.insert(query.collection(), document)?, true)
+        };
+        transaction.commit()?;
+        Ok(result)
+    }
+
     /// Applies operations to the selected committed view in one transaction.
     pub fn update_many(
         &mut self,

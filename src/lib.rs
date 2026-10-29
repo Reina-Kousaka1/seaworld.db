@@ -18,7 +18,9 @@ mod sql;
 mod storage;
 mod update;
 
-pub use api::{API_VERSION, Capabilities, PublicEngine, PublicTransaction, RequestId, capabilities};
+pub use api::{
+    API_VERSION, Capabilities, PublicEngine, PublicTransaction, RequestId, capabilities,
+};
 pub use document::{Document, MAX_DOCUMENT_BYTES, Value};
 pub use error::{Error, ErrorCode, Result};
 pub use index::{FieldPath, IndexId, MAX_FIELD_PATH_DEPTH, MAX_INDEXES};

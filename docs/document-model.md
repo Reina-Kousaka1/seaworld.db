@@ -61,4 +61,9 @@ the query's committed view, respecting sorting, offset and limit, then stage all
 selected changes in one transaction. The `one` variants additionally cap the
 limit at one. If an operation or commit fails, no partial successful result is
 reported. These convenience methods require a writable V2–V4 handle; they do
-not query a caller's already-staged transaction. Upsert is not implemented.
+not query a caller's already-staged transaction. `upsert_one` updates the first
+selected document or inserts an explicitly supplied base document after applying
+the same operations. It never infers inserted fields from the filter and does not
+require the supplied document to match that filter. It rejects a zero query
+limit and commits either path in one transaction; its boolean result indicates
+insertion. Retrying an uncertain commit is not idempotent.
