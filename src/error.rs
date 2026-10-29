@@ -27,6 +27,43 @@ pub enum Error {
 /// Result type used by the SeaWorld DB API.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Transport-neutral categories; details remain available on the original error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ErrorCode {
+    Io,
+    Locked,
+    ReadOnly,
+    RecoveryRequired,
+    Corrupt,
+    InvalidInput,
+    ResourceLimit,
+    NotFound,
+    Conflict,
+    Unsupported,
+    Transaction,
+    Internal,
+}
+
+impl Error {
+    /// Maps internal errors to a transport-neutral category without exposing paths.
+    pub fn code(&self) -> ErrorCode {
+        match self {
+            Self::Io(_) | Self::Randomness(_) => ErrorCode::Io,
+            Self::Locked => ErrorCode::Locked,
+            Self::ReadOnly => ErrorCode::ReadOnly,
+            Self::RecoveryRequired => ErrorCode::RecoveryRequired,
+            Self::Format(_) | Self::Integrity(_) => ErrorCode::Corrupt,
+            Self::InvalidInput(_) | Self::Query(_) => ErrorCode::InvalidInput,
+            Self::Limit(_) => ErrorCode::ResourceLimit,
+            Self::NotFound(_) => ErrorCode::NotFound,
+            Self::Duplicate(_) | Self::ConstraintViolation(_) => ErrorCode::Conflict,
+            Self::UpgradeRequired(_) | Self::UnsupportedIndexValue(_) => ErrorCode::Unsupported,
+            Self::ActiveSnapshots | Self::TransactionState(_) => ErrorCode::Transaction,
+            Self::LockPoisoned => ErrorCode::Internal,
+        }
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

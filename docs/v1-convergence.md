@@ -7,6 +7,12 @@ Backend selection, a stable cross-language ABI and network transport do not yet
 exist. See [WiredTiger assessment](wiredtiger-assessment.md) before changing
 storage responsibilities.
 
+The crate now exposes an API foundation version, capability descriptor,
+bounded request correlation ID and typed error categories. These are
+transport-neutral building blocks, not a server or a completed stable V1
+protocol. Capabilities describe engine features; transactions and field updates
+require a transactional V2–V4 database. Request IDs do not imply deduplication.
+
 ## Candidate transport-neutral contract
 
 An eventual versioned boundary should expose version and capabilities; health

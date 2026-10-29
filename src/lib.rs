@@ -5,6 +5,7 @@
 //! The public API and the planned SQL adapter share one document-native engine. The
 //! V1/V2/V3 files remain readable; new databases use V4 persistent index pages.
 
+mod api;
 mod btree;
 mod codec;
 mod document;
@@ -17,8 +18,9 @@ mod sql;
 mod storage;
 mod update;
 
+pub use api::{API_VERSION, Capabilities, RequestId, capabilities};
 pub use document::{Document, MAX_DOCUMENT_BYTES, Value};
-pub use error::{Error, Result};
+pub use error::{Error, ErrorCode, Result};
 pub use index::{FieldPath, IndexId, MAX_FIELD_PATH_DEPTH, MAX_INDEXES};
 pub use mvcc::{
     CommitVersion, MAX_ACTIVE_SNAPSHOTS, MAX_MVCC_HISTORY_BYTES, Snapshot, SnapshotRow,
