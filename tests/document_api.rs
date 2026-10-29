@@ -318,3 +318,28 @@ fn upsert_uses_explicit_insert_base_and_existing_match() {
         Some(&Value::Integer(2))
     );
 }
+
+#[test]
+fn document_operations_survive_backup_restore_and_compaction() {
+    let source = TempDatabase::new();
+    let backup = TempDatabase::new();
+    let restored = TempDatabase::new();
+    let compacted = TempDatabase::new();
+    let mut db = Database::create(&source.0).unwrap();
+    db.create_collection("items").unwrap();
+    db.create_index("items", "count").unwrap();
+    let id = db.insert("items", Document::empty().with("tags", Value::Array(vec![Value::String("blue".into())]))).unwrap();
+    db.update_one(&Query::new("items", Filter::IdEq(id)), &[DocumentOperation::Increment(FieldPath::parse("count").unwrap(), Value::Integer(3))]).unwrap();
+    let query = Query::new("items", Filter::And(vec![
+        Filter::Compare { path: FieldPath::parse("count").unwrap(), op: seaworld_db::CompareOp::Eq, value: Value::Integer(3) },
+        Filter::ArrayContains { path: FieldPath::parse("tags").unwrap(), value: Value::String("blue".into()) },
+    ]));
+    assert_eq!(db.execute(&query).unwrap()[0].id, id);
+    db.backup(&backup.0).unwrap();
+    Database::restore_backup(&backup.0, &restored.0).unwrap();
+    let restored_db = Database::open_reader(&restored.0).unwrap();
+    assert_eq!(restored_db.execute(&query).unwrap()[0].id, id);
+    restored_db.write_v4_compacted_copy(&compacted.0).unwrap();
+    let compacted_db = Database::open_reader(&compacted.0).unwrap();
+    assert_eq!(compacted_db.execute(&query).unwrap()[0].id, id);
+}
