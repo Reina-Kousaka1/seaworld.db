@@ -247,6 +247,24 @@ fn unique_conflict_in_bulk_update_does_not_publish_any_change() {
 }
 
 #[test]
+fn oversized_intermediate_update_is_rejected_without_changing_input() {
+    let original = Document::empty().with("first", Value::Binary(vec![0; 9 * 1024 * 1024]));
+    let operations = [
+        DocumentOperation::Set(
+            FieldPath::parse("second").unwrap(),
+            Value::Binary(vec![0; 9 * 1024 * 1024]),
+        ),
+        DocumentOperation::Unset(FieldPath::parse("first").unwrap()),
+    ];
+    assert!(matches!(
+        seaworld_db::apply_document_operations(&original, &operations),
+        Err(Error::Limit(_))
+    ));
+    assert!(original.get("second").is_none());
+    assert!(original.get("first").is_some());
+}
+
+#[test]
 fn bulk_updates_and_deletes_are_atomic_and_snapshot_safe() {
     let temp = TempDatabase::new();
     let mut db = Database::create(&temp.0).unwrap();
