@@ -8,13 +8,15 @@ exist. See [WiredTiger assessment](wiredtiger-assessment.md) before changing
 storage responsibilities.
 
 The crate now exposes an API foundation version, capability descriptor,
-bounded request correlation ID and typed error categories. These are
+bounded request correlation ID, typed error categories, and owned
+backend-neutral public query rows. These are
 transport-neutral building blocks, not a server or a completed stable V1
 protocol. Capabilities describe engine features; transactions and field updates
 require a transactional V2–V4 database. Request IDs do not imply deduplication.
 `PublicEngine` and `PublicTransaction` provide an engine-independent Rust
-interface for collections, owned reads, queries, writes and transactions. The
-current `Database` implements this boundary; no second backend is provided.
+interface for collection access, owned reads, full and projected queries,
+one/many mutations, upserts, and transactions. The current `Database`
+implements this boundary; no second backend is provided.
 The interface does not provide a stable foreign-language ABI or wire protocol.
 
 ## Candidate transport-neutral contract
@@ -33,8 +35,10 @@ exactly-once delivery or automatic retries. REST, sockets and FFI remain open.
 
 ## V1 blockers to resolve
 
-- Define and test a versioned public API contract, stable error categories,
-  lifecycle, compatibility policy and operational limits.
+- Qualify the documented public API contract, stable error categories,
+  lifecycle, compatibility policy and operational limits across supported
+  platforms and a defined compatibility period. The foundation deliberately has
+  no stable foreign-language ABI or transport yet.
 - Expand deterministic and generated isolation, corruption, concurrency,
   migration and process-crash coverage; add fuzzing and a supported-platform
   qualification strategy. Process-kill tests alone do not prove power-loss

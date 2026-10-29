@@ -11,9 +11,11 @@ unstated formats, APIs, hardware, or filesystems.
   retains single-operation CRUD; transactions and indexes require a copy to
   V2 or newer, and owning snapshots require V3 or newer.
 - Opening an older file does not silently migrate it. An unknown format version
-  or required flag is rejected; the present API reports `Error::Format`, mapped
-  to `corrupt`, including unsupported versions. Clients must not use that category
-  alone to distinguish corruption from an unsupported version.
+  is rejected as `Error::UnsupportedFormatVersion`, mapped to the stable
+  `unknown_format_version` category. Unsupported required flags are
+  `Error::UnsupportedFeature`, mapped to `incompatible_format`. Malformed
+  headers remain `corrupt_format`, and checksum or semantic failures are
+  `integrity_failure`; clients must use the code rather than parse diagnostics.
 - Compacted-copy migration is explicit and does not overwrite an existing target.
   Verify the new copy and retain the source until the application accepts it.
   Changes that make existing bytes unreadable or reinterpret their meaning need
@@ -56,10 +58,11 @@ See [storage](storage-format.md), [transactions](transactions.md) and
 
 ### V1-BLOCKER
 
-- Freeze and qualify public result, transaction, error and capability semantics,
-  including a backend-neutral query-row type and source-compatible extension
-  policy. Current traits return `SnapshotRow`, and Rust enum additions can break
-  exhaustive downstream matches. Request IDs do not imply deduplication.
+- Qualify the new public result, transaction, error and capability contract on
+  every supported platform and preserve it through a stated compatibility
+  window. `PublicQueryRow` is backend-neutral and `ErrorCode` is non-exhaustive;
+  see [the public API contract](public-api.md). Request IDs do not imply
+  deduplication.
 - Qualify generated document mutations and differential indexed queries across
   reopen, snapshots, failure, recovery and compatibility fixtures; expand fuzz
   and process-crash coverage beyond the present tests.
