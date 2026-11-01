@@ -443,18 +443,26 @@ impl OptimizationObserver {
                 );
                 OptimizationSimulation {
                     candidate,
-                    scan_pressure: index_candidate
-                        .then_some(OptimizationEffect::Reduced)
-                        .unwrap_or(OptimizationEffect::Unknown),
-                    lookup_efficiency: index_candidate
-                        .then_some(OptimizationEffect::Improved)
-                        .unwrap_or(OptimizationEffect::Unknown),
-                    write_maintenance: index_candidate
-                        .then_some(OptimizationEffect::Increased)
-                        .unwrap_or(OptimizationEffect::Unknown),
-                    storage_footprint: index_candidate
-                        .then_some(OptimizationEffect::Increased)
-                        .unwrap_or(OptimizationEffect::Unknown),
+                    scan_pressure: if index_candidate {
+                        OptimizationEffect::Reduced
+                    } else {
+                        OptimizationEffect::Unknown
+                    },
+                    lookup_efficiency: if index_candidate {
+                        OptimizationEffect::Improved
+                    } else {
+                        OptimizationEffect::Unknown
+                    },
+                    write_maintenance: if index_candidate {
+                        OptimizationEffect::Increased
+                    } else {
+                        OptimizationEffect::Unknown
+                    },
+                    storage_footprint: if index_candidate {
+                        OptimizationEffect::Increased
+                    } else {
+                        OptimizationEffect::Unknown
+                    },
                 }
             })
             .collect()
