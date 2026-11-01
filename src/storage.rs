@@ -320,9 +320,26 @@ impl Database {
     ///
     /// Observation is opt-in, is not persisted, and never changes query plans,
     /// transactions, indexes, storage layout, or database bytes. The collected
-    /// data is an internal foundation for later advisor work, not telemetry.
-    pub(crate) fn set_optimization_observation(&mut self, enabled: bool) {
+    /// data is a diagnostic foundation for later advisor work, not telemetry.
+    /// It is outside the transport-neutral [`crate::PublicEngine`] contract.
+    pub fn set_optimization_observation(&mut self, enabled: bool) {
         self.optimization_observer.borrow_mut().set_enabled(enabled);
+    }
+
+    /// Returns an owned snapshot of local workload observations for this handle.
+    ///
+    /// Metrics start empty for every open and are never persisted in the
+    /// database file. Calling this method does not alter engine behavior.
+    pub fn optimization_metrics(&self) -> crate::OptimizationMetrics {
+        self.optimization_observer.borrow().metrics()
+    }
+
+    /// Returns explainable, non-binding suggestions from local observations.
+    ///
+    /// SeaWorld never creates indexes, changes plans, or modifies storage as a
+    /// consequence of these recommendations.
+    pub fn optimization_recommendations(&self) -> Vec<crate::OptimizationRecommendation> {
+        self.optimization_observer.borrow().recommendations()
     }
 
     /// Begins a stable V3 read snapshot that can outlive a mutable writer borrow.
@@ -3974,13 +3991,7 @@ mod tests {
         for _ in 0..crate::advisor::INDEX_RECOMMENDATION_SCAN_THRESHOLD {
             database.execute(&query).unwrap();
         }
-        assert!(
-            database
-                .optimization_observer
-                .borrow()
-                .recommendations()
-                .is_empty()
-        );
+        assert!(database.optimization_recommendations().is_empty());
 
         database.set_optimization_observation(true);
         let mut rolled_back = database.begin_transaction().unwrap();
@@ -4009,7 +4020,7 @@ mod tests {
         database.create_index("events", "account").unwrap();
         database.execute(&query).unwrap();
         database.get("events", id).unwrap();
-        let recommendations = database.optimization_observer.borrow().recommendations();
+        let recommendations = database.optimization_recommendations();
         assert!(recommendations.iter().any(|recommendation| matches!(
             recommendation,
             crate::advisor::OptimizationRecommendation::ConsiderIndex { collection, path, .. }
@@ -4020,7 +4031,7 @@ mod tests {
             crate::advisor::OptimizationRecommendation::PotentialHotDocument { collection, id: candidate, .. }
                 if collection == "events" && *candidate == id
         )));
-        let metrics = database.optimization_observer.borrow().metrics();
+        let metrics = database.optimization_metrics();
         assert_eq!(
             metrics.collections["events"].full_scans,
             crate::advisor::INDEX_RECOMMENDATION_SCAN_THRESHOLD
@@ -4035,14 +4046,7 @@ mod tests {
         database.close().unwrap();
         let reopened = Database::open_reader(&path).unwrap();
         assert_eq!(reopened.execute(&query).unwrap().len(), 1);
-        assert!(
-            reopened
-                .optimization_observer
-                .borrow()
-                .metrics()
-                .collections
-                .is_empty()
-        );
+        assert!(reopened.optimization_metrics().collections.is_empty());
         drop(reopened);
         let _ = fs::remove_file(&path);
         let _ = fs::remove_file(sidecar_path(&path, ".writer.lock").unwrap());

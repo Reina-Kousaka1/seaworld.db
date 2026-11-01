@@ -73,8 +73,11 @@ One exclusive writer handle and any fixed read-only handles are supported. The w
 
 ## Adaptive optimization foundation
 
-SeaWorld has an internal, opt-in, handle-local observation component for future
-adaptive-engine work. When enabled by the engine, it counts collection reads,
+SeaWorld has an opt-in, handle-local native diagnostic component for future
+adaptive-engine work. `Database::set_optimization_observation(true)` enables
+observation, `optimization_metrics` returns an owned metric snapshot, and
+`optimization_recommendations` returns non-binding suggestions. When enabled,
+it counts collection reads,
 committed document writes, full scans, primary-ID lookups, secondary-index
 lookups, and range scans. It can produce explainable suggestions after bounded
 thresholds: a repeated full-scan comparison path can be marked as a candidate
@@ -82,11 +85,12 @@ for a manually considered index, and a repeatedly mutated document can be
 marked as a potential hot target.
 
 This component is not telemetry: it has no network path, is disabled by
-default, is never written to a SeaWorld file, and is cleared on reopen. It does
-not create indexes, alter plans, force compaction, move data, serialize hot
-keys, schedule work, or change transaction semantics. It deliberately does not
-recommend array-element indexes because multikey indexing has no approved
-SeaWorld architecture. Admission control, workload scheduling, shard-local
+default, is never written to a SeaWorld file, and is cleared on reopen. It is
+outside the transport-neutral `PublicEngine` contract. It does not create
+indexes, alter plans, force compaction, move data, serialize hot keys, schedule
+work, or change transaction semantics. It deliberately does not recommend
+array-element indexes because multikey indexing has no approved SeaWorld
+architecture. Admission control, workload scheduling, shard-local
 execution, shard-per-core ownership, cluster operation, replication, and
 automatic physical representations remain future architecture work.
 

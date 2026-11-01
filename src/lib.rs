@@ -23,6 +23,10 @@ pub use api::{
     API_VERSION, ApiInfo, Capabilities, EngineHealth, OperationContext, PublicEngine,
     PublicQueryRow, PublicRowValue, PublicTransaction, RequestId, capabilities,
 };
+pub use advisor::{
+    CollectionObservation, HOT_DOCUMENT_WRITE_THRESHOLD, INDEX_RECOMMENDATION_SCAN_THRESHOLD,
+    OptimizationMetrics, OptimizationRecommendation,
+};
 pub use document::{Document, MAX_DOCUMENT_BYTES, Value};
 pub use error::{Error, ErrorCode, Result};
 pub use index::{FieldPath, IndexId, MAX_FIELD_PATH_DEPTH, MAX_INDEXES};

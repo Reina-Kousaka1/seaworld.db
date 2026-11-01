@@ -142,3 +142,12 @@ The current `Database` is the sole implementation of `PublicEngine`. A later
 backend may implement the same owned values and error/capability contract, but
 cannot expose backend handles or silently reinterpret existing `*.seaworld.db`
 files. WiredTiger is not enabled, integrated, or required by this contract.
+
+## Native diagnostic extension
+
+`Database::set_optimization_observation`, `optimization_metrics`, and
+`optimization_recommendations` are opt-in, handle-local Rust diagnostics. They
+are deliberately outside the transport-neutral `PublicEngine` boundary: they
+are neither network telemetry nor a backend requirement. Their metrics and
+recommendations are in-memory only, reset on reopen, and can never create an
+index, change a plan, mutate storage, or alter transaction results.

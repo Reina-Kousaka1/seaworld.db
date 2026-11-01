@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Local, opt-in workload observation for future engine planning.
 //!
-//! This module is deliberately not a public API or persistent database feature.
-//! It observes a single embedded handle only. It never changes plans, indexes,
-//! storage layout, transaction ordering, or database bytes.
+//! This module is a native diagnostic API, not a persistent database feature or
+//! part of the transport-neutral `PublicEngine` contract. It observes a single
+//! embedded handle only. It never changes plans, indexes, storage layout,
+//! transaction ordering, or database bytes.
 
 use std::collections::BTreeMap;
 
@@ -12,30 +13,33 @@ use crate::{DocumentId, FieldPath, Filter, Query, QueryPlan};
 /// A workload must produce this many observed full scans for one path before
 /// the advisor suggests considering an access path. This is a recommendation,
 /// not a cost model or an automatic DDL action.
-pub(crate) const INDEX_RECOMMENDATION_SCAN_THRESHOLD: u64 = 8;
+pub const INDEX_RECOMMENDATION_SCAN_THRESHOLD: u64 = 8;
 /// A document must receive this many committed writes before the advisor calls
 /// it a hot-mutation candidate.
-pub(crate) const HOT_DOCUMENT_WRITE_THRESHOLD: u64 = 16;
+pub const HOT_DOCUMENT_WRITE_THRESHOLD: u64 = 16;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct CollectionObservation {
-    pub(crate) reads: u64,
-    pub(crate) writes: u64,
-    pub(crate) full_scans: u64,
-    pub(crate) primary_key_lookups: u64,
-    pub(crate) secondary_index_lookups: u64,
-    pub(crate) secondary_index_range_scans: u64,
+#[non_exhaustive]
+pub struct CollectionObservation {
+    pub reads: u64,
+    pub writes: u64,
+    pub full_scans: u64,
+    pub primary_key_lookups: u64,
+    pub secondary_index_lookups: u64,
+    pub secondary_index_range_scans: u64,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct OptimizationMetrics {
-    pub(crate) enabled: bool,
-    pub(crate) collections: BTreeMap<String, CollectionObservation>,
+#[non_exhaustive]
+pub struct OptimizationMetrics {
+    pub enabled: bool,
+    pub collections: BTreeMap<String, CollectionObservation>,
 }
 
 /// An explainable observation-derived suggestion. The advisor never applies it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum OptimizationRecommendation {
+#[non_exhaustive]
+pub enum OptimizationRecommendation {
     ConsiderIndex {
         collection: String,
         path: FieldPath,
