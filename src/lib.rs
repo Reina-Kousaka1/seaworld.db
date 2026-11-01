@@ -20,8 +20,8 @@ mod storage;
 mod update;
 
 pub use advisor::{
-    CollectionObservation, HOT_DOCUMENT_WRITE_THRESHOLD, INDEX_RECOMMENDATION_SCAN_THRESHOLD,
-    OptimizationMetrics, OptimizationRecommendation,
+    CAS_CONTENTION_THRESHOLD, CollectionObservation, HOT_DOCUMENT_WRITE_THRESHOLD,
+    INDEX_RECOMMENDATION_SCAN_THRESHOLD, OptimizationMetrics, OptimizationRecommendation,
 };
 pub use api::{
     API_VERSION, ApiInfo, Capabilities, EngineHealth, OperationContext, PublicEngine,
@@ -43,7 +43,9 @@ pub use storage::{
     Database, IndexInfo, IntegrityReport, MAX_COLLECTIONS, MAX_DATABASE_BYTES, MAX_DOCUMENTS,
     RecoveryReport, Transaction,
 };
-pub use update::{DocumentOperation, apply_document_operations};
+pub use update::{
+    CompareAndSetExpectation, CompareAndSetResult, DocumentOperation, apply_document_operations,
+};
 
 /// A stable, positive identifier assigned to a document within a database.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

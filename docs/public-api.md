@@ -151,3 +151,19 @@ are deliberately outside the transport-neutral `PublicEngine` boundary: they
 are neither network telemetry nor a backend requirement. Their metrics and
 recommendations are in-memory only, reset on reopen, and can never create an
 index, change a plan, mutate storage, or alter transaction results.
+
+## Native transaction extensions
+
+`Transaction::compare_and_set` and `Transaction::snapshot_version` are native
+Rust extensions on the current `Database` backend; they are not additions to
+the frozen transport-neutral `PublicTransaction` V1 contract. CAS uses
+`CompareAndSetExpectation::{Missing, Value}` and returns
+`CompareAndSetResult::{Updated, ConditionNotMet}`. `Missing` does not match an
+explicit null. A condition mismatch stages no write and is not a durable
+idempotency, retry, or multi-writer conflict result.
+
+The existing backend has one writer at a time, enforced by the writer lock and
+Rust ownership. CAS is atomic with that serialized commit path and is recovered
+as its ordinary document update transaction; it is not a promise of parallel
+multi-writer compare-and-set. Future public exposure requires an additive API
+version/capability decision rather than silently changing `PublicTransaction`.

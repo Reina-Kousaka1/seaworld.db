@@ -81,9 +81,11 @@ distributed-system guarantees.
 - [x] Add an internal, opt-in, non-persistent observation foundation for query
   access paths and committed document writes. It only produces explainable
   candidate-index and hot-document recommendations.
+- [x] Add a native, one-writer atomic compare-and-set extension that evaluates
+  against the staged view and persists through the established transaction
+  batch; this is not a multi-writer conflict protocol.
 - [ ] Design a multi-writer conflict model before adding retries, commutative
-  merge, compare-and-set, append, field-level conflict tracking, or durable
-  idempotency.
+  merge, append, field-level conflict tracking, or durable idempotency.
 - [ ] Decide whether any automatic index/storage adaptation is safe enough for
   a future administrative policy; the current advisor never makes changes.
 

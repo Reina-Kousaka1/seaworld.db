@@ -48,18 +48,50 @@ numeric add/subtract mutations. They calculate from the transaction's staged
 view and are persisted atomically with the rest of that transaction. Therefore
 two *successive* committed increments of `-200` and `-300` from `1000` produce
 `500`, rather than losing one delta through an application-level read/replace
-cycle. The current engine permits one writer only, however: it does not provide
-multi-writer commutative mutation merging, field-level conflict detection,
-compare-and-set, append, or document merge semantics. Those require a separate
-conflict and storage-format design; they are not inferred from the existing
-increment operation.
+cycle.
+
+The native `Transaction::compare_and_set` extension conditionally stages a
+single `Set` in the same overlay. It distinguishes `Missing` from explicit
+`Value::Null`, reports `Updated` or `ConditionNotMet`, and never turns a normal
+condition mismatch into an I/O or recovery error. On a match, its resulting
+document update shares the ordinary checksummed transaction batch, sync, index
+publication, and recovery path; no special on-disk CAS record exists. The
+condition is evaluated against the transaction's staged view, so read-your-own
+writes apply. `snapshot_version` exposes the V3/V4 committed version visible at
+transaction creation for diagnostics; it is `None` for V2.
+
+The current engine still permits one writer only: the writer sidecar lock
+excludes a second cooperative writer process, and `Transaction` owns an
+exclusive mutable borrow of `Database` until it commits or rolls back.
+Consequently SeaWorld has no overlapping writer transactions from which to
+derive read/write or write/write conflict results today. Concurrent `Set`
+operations are serialized by ownership rather than resolved after the fact;
+concurrent `Increment`/`Decrement` calls are likewise successive committed
+operations, not multi-writer commutative merging. A second writer open returns
+`Locked`. This deliberately prevents lost updates in the supported model but is
+not multi-writer MVCC.
+
+The implemented internal conflict model is therefore intentionally narrow:
+
+| Situation | Current behavior |
+| --- | --- |
+| Two SeaWorld writer transactions | Cannot overlap; writer lock and mutable ownership serialize them. |
+| Unique/index validation failure | The batch is rejected before append. |
+| CAS condition mismatch | `ConditionNotMet`; no mutation is staged and it is not an automatic retry signal. |
+| Resource/history bound | A regular limit error; no partial batch is published. |
+| Append/sync outcome ambiguity | The handle fails closed and must be reopened. |
+
+SeaWorld does not automatically retry any of these paths. In particular, CAS
+failure is distinct from a storage failure: callers may choose a new operation,
+whereas a failed sync requires reopen and recovery inspection.
 
 The current conflict boundary is consequently intentionally coarse. The writer
 lock and exclusive mutable database borrow serialize writes. A unique-index or
 resource/history-limit failure prevents the batch before append; any failed
 post-append I/O path fails the handle closed. SeaWorld does not claim field-path
 conflict detection, automatic retry, serializable isolation, predicate locks,
-or durable external idempotency.
+multi-writer parallel commit, APPEND/MERGE mutations, or durable external
+idempotency.
 
 V3 adds in-process MVCC snapshots, bounded to 1,024 leases and 64 MiB of retained encoded document history. V4 retains those semantics. Read-only handles replay under a shared commit lock and then use a fixed in-memory view while one writer appends. An incomplete suffix discovered in read-only mode returns `RecoveryRequired`; only a writable open may truncate it. V3/V4 compaction refuses while snapshots remain active. MVCC history is rebuilt from the current committed state on reopen and is not retained across process restarts.
 

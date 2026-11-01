@@ -3,6 +3,28 @@ use std::collections::BTreeMap;
 
 use crate::{Document, Error, FieldPath, Result, Value};
 
+/// The expected field state for an atomic compare-and-set mutation.
+///
+/// `Missing` is distinct from `Value(Value::Null)`: the former matches only an
+/// absent path, while the latter matches an explicit document null.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum CompareAndSetExpectation {
+    Missing,
+    Value(Value),
+}
+
+/// The condition result of an atomic compare-and-set mutation.
+///
+/// A non-matching condition is a normal, non-retryable result rather than a
+/// storage, recovery, or transaction error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CompareAndSetResult {
+    Updated,
+    ConditionNotMet,
+}
+
 /// A single document mutation. Operations are applied in order.
 #[derive(Debug, Clone, PartialEq)]
 pub enum DocumentOperation {

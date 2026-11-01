@@ -8,8 +8,9 @@ use std::{
 };
 
 use seaworld_db::{
-    Database, Document, DocumentOperation, EngineHealth, Error, ErrorCode, FieldPath, Filter,
-    MAX_PROJECTION_FIELDS, OperationContext, Projection, PublicRowValue, Query, Value,
+    CompareAndSetExpectation, CompareAndSetResult, Database, Document, DocumentOperation,
+    EngineHealth, Error, ErrorCode, FieldPath, Filter, MAX_PROJECTION_FIELDS, OperationContext,
+    Projection, PublicRowValue, Query, Value,
 };
 
 static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(1);
@@ -466,6 +467,116 @@ fn sequential_add_mutations_preserve_each_committed_delta() {
     assert_eq!(
         db.get("accounts", id).unwrap().unwrap().get("balance"),
         Some(&Value::Integer(500))
+    );
+}
+
+#[test]
+fn compare_and_set_uses_the_staged_view_and_is_reopen_safe() {
+    let temp = TempDatabase::new();
+    let mut db = Database::create(&temp.0).unwrap();
+    db.create_collection("accounts").unwrap();
+    let id = db
+        .insert(
+            "accounts",
+            Document::empty()
+                .with("balance", Value::Integer(1_000))
+                .with("claim", Value::Null),
+        )
+        .unwrap();
+    let balance = FieldPath::parse("balance").unwrap();
+    let claim = FieldPath::parse("claim").unwrap();
+
+    let snapshot_version = db.current_version().unwrap();
+    let mut transaction = db.begin_transaction().unwrap();
+    assert_eq!(transaction.snapshot_version(), Some(snapshot_version));
+    assert_eq!(
+        transaction
+            .compare_and_set(
+                "accounts",
+                id,
+                balance.clone(),
+                CompareAndSetExpectation::Value(Value::Integer(1_000)),
+                Value::Integer(800),
+            )
+            .unwrap(),
+        CompareAndSetResult::Updated
+    );
+    // CAS sees the transaction's own prior staged mutation, not only the
+    // database value that existed when the transaction began.
+    assert_eq!(
+        transaction
+            .compare_and_set(
+                "accounts",
+                id,
+                claim,
+                CompareAndSetExpectation::Value(Value::Null),
+                Value::Boolean(true),
+            )
+            .unwrap(),
+        CompareAndSetResult::Updated
+    );
+    transaction.commit().unwrap();
+
+    let mut failed = db.begin_transaction().unwrap();
+    assert_eq!(
+        failed
+            .compare_and_set(
+                "accounts",
+                id,
+                balance,
+                CompareAndSetExpectation::Value(Value::Integer(1_000)),
+                Value::Integer(700),
+            )
+            .unwrap(),
+        CompareAndSetResult::ConditionNotMet
+    );
+    failed.rollback();
+    db.close().unwrap();
+
+    let reopened = Database::open_reader(&temp.0).unwrap();
+    let document = reopened.get("accounts", id).unwrap().unwrap();
+    assert_eq!(document.get("balance"), Some(&Value::Integer(800)));
+    assert_eq!(document.get("claim"), Some(&Value::Boolean(true)));
+}
+
+#[test]
+fn compare_and_set_distinguishes_missing_from_explicit_null() {
+    let temp = TempDatabase::new();
+    let mut db = Database::create(&temp.0).unwrap();
+    db.create_collection("items").unwrap();
+    let id = db
+        .insert("items", Document::empty().with("explicit", Value::Null))
+        .unwrap();
+
+    let mut transaction = db.begin_transaction().unwrap();
+    assert_eq!(
+        transaction
+            .compare_and_set(
+                "items",
+                id,
+                FieldPath::parse("missing").unwrap(),
+                CompareAndSetExpectation::Missing,
+                Value::Integer(1),
+            )
+            .unwrap(),
+        CompareAndSetResult::Updated
+    );
+    assert_eq!(
+        transaction
+            .compare_and_set(
+                "items",
+                id,
+                FieldPath::parse("explicit").unwrap(),
+                CompareAndSetExpectation::Missing,
+                Value::Integer(1),
+            )
+            .unwrap(),
+        CompareAndSetResult::ConditionNotMet
+    );
+    transaction.commit().unwrap();
+    assert_eq!(
+        db.get("items", id).unwrap().unwrap().get("missing"),
+        Some(&Value::Integer(1))
     );
 }
 

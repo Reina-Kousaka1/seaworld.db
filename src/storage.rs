@@ -365,7 +365,10 @@ impl Database {
             return Err(Error::Limit("transaction ID space is exhausted".into()));
         }
         let id = self.next_transaction_id;
-        Ok(Transaction::new(self, id))
+        let snapshot_version = (self.format_version >= MVCC_FORMAT_VERSION)
+            .then(|| self.current_version())
+            .transpose()?;
+        Ok(Transaction::new(self, id, snapshot_version))
     }
 
     /// Reports any incomplete final record discarded during open.
@@ -2963,6 +2966,7 @@ impl Database {
 pub struct Transaction<'database> {
     database: &'database mut Database,
     id: i64,
+    snapshot_version: Option<CommitVersion>,
     operations: Vec<StagedOperation>,
     overlay: HashMap<i64, OverlayDocument>,
     new_collections: HashMap<String, i64>,
@@ -2970,6 +2974,7 @@ pub struct Transaction<'database> {
     next_document_id: i64,
     document_ids_exhausted: bool,
     operation_bytes: usize,
+    successful_compare_and_sets: Vec<(String, DocumentId)>,
 }
 
 struct PendingReplayTransaction {
@@ -3121,18 +3126,33 @@ fn decode_staged_operation(record_type: RecordType, payload: &[u8]) -> Result<St
 }
 
 impl<'database> Transaction<'database> {
-    fn new(database: &'database mut Database, id: i64) -> Self {
+    fn new(
+        database: &'database mut Database,
+        id: i64,
+        snapshot_version: Option<CommitVersion>,
+    ) -> Self {
         Self {
             next_collection_id: database.next_collection_id,
             next_document_id: database.next_document_id,
             document_ids_exhausted: database.document_ids_exhausted,
             database,
             id,
+            snapshot_version,
             operations: Vec::new(),
             overlay: HashMap::new(),
             new_collections: HashMap::new(),
             operation_bytes: 0,
+            successful_compare_and_sets: Vec::new(),
         }
+    }
+
+    /// Returns the committed version visible when this V3/V4 transaction began.
+    ///
+    /// V2 transactions have no MVCC commit-version watermark and return `None`.
+    /// The current embedded writer model serializes transactions, so this is an
+    /// identity/diagnostic value rather than a public multi-writer conflict API.
+    pub const fn snapshot_version(&self) -> Option<CommitVersion> {
+        self.snapshot_version
     }
 
     /// Persists a new collection as part of this transaction.
@@ -3260,6 +3280,52 @@ impl<'database> Transaction<'database> {
         self.update(collection_name, id, updated)
     }
 
+    /// Conditionally sets one document field in this transaction's staged view.
+    ///
+    /// The condition and the staged replacement are evaluated atomically with
+    /// respect to SeaWorld's current single-writer commit path. `Missing` only
+    /// matches an absent field; it does not match an explicit null. A missing
+    /// document or a non-matching field produces `ConditionNotMet` and stages
+    /// no mutation. This is a native extension, not a new `PublicEngine` API.
+    pub fn compare_and_set(
+        &mut self,
+        collection_name: &str,
+        id: DocumentId,
+        path: crate::FieldPath,
+        expected: crate::CompareAndSetExpectation,
+        new: crate::Value,
+    ) -> Result<crate::CompareAndSetResult> {
+        self.database.check_usable()?;
+        let matches = self
+            .get(collection_name, id)?
+            .is_some_and(|document| match &expected {
+                crate::CompareAndSetExpectation::Missing => path.get(document).is_none(),
+                crate::CompareAndSetExpectation::Value(value) => {
+                    path.get(document) == Some(value)
+                }
+            });
+        self.database
+            .optimization_observer
+            .borrow_mut()
+            .record_compare_and_set_attempt(collection_name.to_owned(), id, matches);
+        if !matches {
+            return Ok(crate::CompareAndSetResult::ConditionNotMet);
+        }
+        let updated = self.update_fields(
+            collection_name,
+            id,
+            &[crate::DocumentOperation::Set(path, new)],
+        )?;
+        if !updated {
+            return Err(Error::Integrity(
+                "compare-and-set target disappeared from its staged view".into(),
+            ));
+        }
+        self.successful_compare_and_sets
+            .push((collection_name.to_owned(), id));
+        Ok(crate::CompareAndSetResult::Updated)
+    }
+
     /// Deletes a document visible in this transaction.
     pub fn delete(&mut self, collection_name: &str, id: DocumentId) -> Result<bool> {
         self.database.check_usable()?;
@@ -3314,6 +3380,7 @@ impl<'database> Transaction<'database> {
             next_collection_id,
             next_document_id,
             document_ids_exhausted,
+            successful_compare_and_sets,
             ..
         } = self;
         let result = database.apply_transaction_state(
@@ -3332,6 +3399,12 @@ impl<'database> Transaction<'database> {
         });
         if result.is_err() {
             database.write_failed = true;
+        }
+        if result.is_ok() {
+            let mut observer = database.optimization_observer.borrow_mut();
+            for (collection, _) in successful_compare_and_sets {
+                observer.record_committed_compare_and_set(collection);
+            }
         }
         result
     }
@@ -3937,7 +4010,10 @@ fn crash_pause(_point: &str) -> ! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{CompareOp, Document, FieldPath, Filter, Query, Value};
+    use crate::{
+        CompareAndSetExpectation, CompareAndSetResult, CompareOp, Document, FieldPath, Filter,
+        Query, Value,
+    };
     use std::{
         fs,
         path::PathBuf,
@@ -4048,6 +4124,95 @@ mod tests {
         assert_eq!(reopened.execute(&query).unwrap().len(), 1);
         assert!(reopened.optimization_metrics().collections.is_empty());
         drop(reopened);
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_file(sidecar_path(&path, ".writer.lock").unwrap());
+    }
+
+    #[test]
+    fn compare_and_set_diagnostics_are_opt_in_and_committed_only() {
+        let path = observation_test_path();
+        let mut database = Database::create(&path).unwrap();
+        database.create_collection("accounts").unwrap();
+        let id = database
+            .insert(
+                "accounts",
+                Document::empty().with("balance", Value::Integer(100)),
+            )
+            .unwrap();
+        let balance = FieldPath::parse("balance").unwrap();
+
+        for _ in 0..crate::advisor::CAS_CONTENTION_THRESHOLD {
+            let mut transaction = database.begin_transaction().unwrap();
+            assert_eq!(
+                transaction
+                    .compare_and_set(
+                        "accounts",
+                        id,
+                        balance.clone(),
+                        CompareAndSetExpectation::Value(Value::Integer(0)),
+                        Value::Integer(1),
+                    )
+                    .unwrap(),
+                CompareAndSetResult::ConditionNotMet
+            );
+            transaction.rollback();
+        }
+        assert!(database.optimization_metrics().collections.is_empty());
+
+        database.set_optimization_observation(true);
+        for _ in 0..crate::advisor::CAS_CONTENTION_THRESHOLD {
+            let mut transaction = database.begin_transaction().unwrap();
+            assert_eq!(
+                transaction
+                    .compare_and_set(
+                        "accounts",
+                        id,
+                        balance.clone(),
+                        CompareAndSetExpectation::Value(Value::Integer(0)),
+                        Value::Integer(1),
+                    )
+                    .unwrap(),
+                CompareAndSetResult::ConditionNotMet
+            );
+            transaction.rollback();
+        }
+        let mut transaction = database.begin_transaction().unwrap();
+        assert_eq!(
+            transaction
+                .compare_and_set(
+                    "accounts",
+                    id,
+                    balance,
+                    CompareAndSetExpectation::Value(Value::Integer(100)),
+                    Value::Integer(101),
+                )
+                .unwrap(),
+            CompareAndSetResult::Updated
+        );
+        transaction.commit().unwrap();
+
+        let metrics = database.optimization_metrics();
+        let accounts = &metrics.collections["accounts"];
+        assert_eq!(
+            accounts.compare_and_set_attempts,
+            crate::advisor::CAS_CONTENTION_THRESHOLD + 1
+        );
+        assert_eq!(
+            accounts.compare_and_set_failures,
+            crate::advisor::CAS_CONTENTION_THRESHOLD
+        );
+        assert_eq!(accounts.committed_compare_and_sets, 1);
+        assert!(database.optimization_recommendations().iter().any(|recommendation| matches!(
+            recommendation,
+            crate::advisor::OptimizationRecommendation::PotentialCompareAndSetContention {
+                collection,
+                id: candidate,
+                observed_failures,
+            } if collection == "accounts"
+                && *candidate == id
+                && *observed_failures == crate::advisor::CAS_CONTENTION_THRESHOLD
+        )));
+        database.close().unwrap();
         let _ = fs::remove_file(&path);
         let _ = fs::remove_file(sidecar_path(&path, ".writer.lock").unwrap());
     }
