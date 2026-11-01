@@ -423,7 +423,11 @@ fn interrupted_backup_or_compaction_never_publishes_a_partial_destination() {
                 }
                 thread::sleep(Duration::from_millis(10));
             }
-            if point.starts_with("compaction_after_publish") {
+            if matches!(
+                *point,
+                "compaction_after_publish_before_directory_sync"
+                    | "compaction_after_directory_sync_before_cleanup"
+            ) {
                 let copy = Database::open_reader(&target).unwrap();
                 copy.check_integrity().unwrap();
                 assert_eq!(copy.document_ids("users").unwrap().len(), 1);
