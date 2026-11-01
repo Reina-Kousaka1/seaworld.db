@@ -393,6 +393,7 @@ completed 105 tests with zero failures, including the generated tests and all
 - [Document model and update semantics](docs/document-model.md)
 - [Native query engine](docs/query-engine.md)
 - [Transactions and recovery](docs/transactions.md)
+- [Core invariants and durability review](docs/core-invariants.md)
 - [MVCC snapshots and reader/writer model](docs/mvcc.md)
 - [Indexes](docs/indexes.md) and [persistent index storage](docs/index-storage.md)
 - [Backup and restore](docs/backup.md)
