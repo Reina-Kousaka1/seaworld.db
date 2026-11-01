@@ -3,7 +3,8 @@
 use std::{env, path::PathBuf, process};
 
 use seaworld_db::{
-    CompareOp, Database, Document, DocumentId, DocumentOperation, FieldPath, Filter, Query, Value,
+    CompareAndSetExpectation, CompareAndSetResult, CompareOp, Database, Document, DocumentId,
+    DocumentOperation, FieldPath, Filter, Query, Value,
 };
 
 fn path(value: &str) -> FieldPath {
@@ -14,7 +15,7 @@ fn main() {
     let mut arguments = env::args_os().skip(1);
     let Some(database_path) = arguments.next().map(PathBuf::from) else {
         eprintln!(
-            "usage: crash_writer <database-path> [--recover|--backup TARGET|--bulk-update|--bulk-delete|--upsert|--mixed-transaction]"
+            "usage: crash_writer <database-path> [--recover|--backup TARGET|--bulk-update|--bulk-delete|--upsert|--mixed-transaction|--compare-and-set]"
         );
         process::exit(2);
     };
@@ -117,6 +118,22 @@ fn main() {
                     .with("key", Value::String("d".into()))
                     .with("score", Value::Integer(4)),
             )?;
+            transaction.commit()
+        })(),
+        Some("--compare-and-set") => (|| {
+            let mut transaction = database.begin_transaction()?;
+            let result = transaction.compare_and_set(
+                "users",
+                DocumentId::new(1)?,
+                path("score"),
+                CompareAndSetExpectation::Value(Value::Integer(1)),
+                Value::Integer(2),
+            )?;
+            if result != CompareAndSetResult::Updated {
+                return Err(seaworld_db::Error::TransactionState(
+                    "crash fixture compare-and-set condition did not match".into(),
+                ));
+            }
             transaction.commit()
         })(),
         _ => (|| {

@@ -164,6 +164,7 @@ fn document_operations_crash_only_publish_whole_committed_states() {
         "--bulk-delete",
         "--upsert",
         "--mixed-transaction",
+        "--compare-and-set",
     ];
 
     for mode in modes {
