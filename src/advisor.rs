@@ -128,10 +128,8 @@ impl OptimizationObserver {
                     } else if self.full_scan_paths.len() < MAX_OBSERVED_SCAN_PATHS {
                         self.full_scan_paths.insert(key, 1);
                     } else {
-                        self.metrics.dropped_scan_path_candidates = self
-                            .metrics
-                            .dropped_scan_path_candidates
-                            .saturating_add(1);
+                        self.metrics.dropped_scan_path_candidates =
+                            self.metrics.dropped_scan_path_candidates.saturating_add(1);
                     }
                 }
             }
@@ -228,11 +226,13 @@ impl OptimizationObserver {
                 });
             }
             if observation.compare_and_set_failures >= CAS_CONTENTION_THRESHOLD {
-                recommendations.push(OptimizationRecommendation::PotentialCompareAndSetContention {
-                    collection: collection.clone(),
-                    id: *id,
-                    observed_failures: observation.compare_and_set_failures,
-                });
+                recommendations.push(
+                    OptimizationRecommendation::PotentialCompareAndSetContention {
+                        collection: collection.clone(),
+                        id: *id,
+                        observed_failures: observation.compare_and_set_failures,
+                    },
+                );
             }
         }
         recommendations
@@ -248,13 +248,12 @@ impl OptimizationObserver {
             return self.documents.get_mut(&key);
         }
         if self.documents.len() >= MAX_OBSERVED_DOCUMENTS {
-            self.metrics.dropped_document_candidates = self
-                .metrics
-                .dropped_document_candidates
-                .saturating_add(1);
+            self.metrics.dropped_document_candidates =
+                self.metrics.dropped_document_candidates.saturating_add(1);
             return None;
         }
-        self.documents.insert(key.clone(), DocumentObservation::default());
+        self.documents
+            .insert(key.clone(), DocumentObservation::default());
         self.documents.get_mut(&key)
     }
 }
@@ -338,21 +337,26 @@ mod tests {
         let metrics = observer.metrics();
         assert_eq!(metrics.collections["accounts"].compare_and_set_attempts, 9);
         assert_eq!(metrics.collections["accounts"].compare_and_set_failures, 8);
-        assert_eq!(metrics.collections["accounts"].committed_compare_and_sets, 1);
-        assert!(observer.recommendations().iter().any(|recommendation| matches!(
-            recommendation,
-            OptimizationRecommendation::PotentialCompareAndSetContention {
-                collection,
-                id: candidate,
-                observed_failures: CAS_CONTENTION_THRESHOLD,
-            } if collection == "accounts" && *candidate == id
-        )));
+        assert_eq!(
+            metrics.collections["accounts"].committed_compare_and_sets,
+            1
+        );
+        assert!(
+            observer
+                .recommendations()
+                .iter()
+                .any(|recommendation| matches!(
+                    recommendation,
+                    OptimizationRecommendation::PotentialCompareAndSetContention {
+                        collection,
+                        id: candidate,
+                        observed_failures: CAS_CONTENTION_THRESHOLD,
+                    } if collection == "accounts" && *candidate == id
+                ))
+        );
 
         for value in 1..=MAX_OBSERVED_DOCUMENTS + 1 {
-            observer.record_committed_write(
-                "other".into(),
-                DocumentId::new(value as i64).unwrap(),
-            );
+            observer.record_committed_write("other".into(), DocumentId::new(value as i64).unwrap());
         }
         assert!(observer.metrics().dropped_document_candidates > 0);
     }

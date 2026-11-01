@@ -3300,9 +3300,7 @@ impl<'database> Transaction<'database> {
             .get(collection_name, id)?
             .is_some_and(|document| match &expected {
                 crate::CompareAndSetExpectation::Missing => path.get(document).is_none(),
-                crate::CompareAndSetExpectation::Value(value) => {
-                    path.get(document) == Some(value)
-                }
+                crate::CompareAndSetExpectation::Value(value) => path.get(document) == Some(value),
             });
         self.database
             .optimization_observer
@@ -4202,16 +4200,21 @@ mod tests {
             crate::advisor::CAS_CONTENTION_THRESHOLD
         );
         assert_eq!(accounts.committed_compare_and_sets, 1);
-        assert!(database.optimization_recommendations().iter().any(|recommendation| matches!(
-            recommendation,
-            crate::advisor::OptimizationRecommendation::PotentialCompareAndSetContention {
-                collection,
-                id: candidate,
-                observed_failures,
-            } if collection == "accounts"
-                && *candidate == id
-                && *observed_failures == crate::advisor::CAS_CONTENTION_THRESHOLD
-        )));
+        assert!(
+            database
+                .optimization_recommendations()
+                .iter()
+                .any(|recommendation| matches!(
+                    recommendation,
+                    crate::advisor::OptimizationRecommendation::PotentialCompareAndSetContention {
+                        collection,
+                        id: candidate,
+                        observed_failures,
+                    } if collection == "accounts"
+                        && *candidate == id
+                        && *observed_failures == crate::advisor::CAS_CONTENTION_THRESHOLD
+                ))
+        );
         database.close().unwrap();
         let _ = fs::remove_file(&path);
         let _ = fs::remove_file(sidecar_path(&path, ".writer.lock").unwrap());
