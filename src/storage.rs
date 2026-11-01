@@ -1935,10 +1935,12 @@ impl Database {
             let _ = fs::remove_file(&temporary);
             return Err(Error::Io(error));
         }
+        crash_pause_if("compaction_after_publish_before_directory_sync");
         if let Err(error) = sync_parent_directory(&target) {
             let _ = fs::remove_file(&temporary);
             return Err(error);
         }
+        crash_pause_if("compaction_after_directory_sync_before_cleanup");
         let _ = fs::remove_file(&temporary);
         let _ = sync_parent_directory(&target);
         Ok(())
@@ -2109,10 +2111,12 @@ impl Database {
             let _ = fs::remove_file(&temporary);
             return Err(Error::Io(error));
         }
+        crash_pause_if("compaction_after_publish_before_directory_sync");
         if let Err(error) = sync_parent_directory(&target) {
             let _ = fs::remove_file(&temporary);
             return Err(error);
         }
+        crash_pause_if("compaction_after_directory_sync_before_cleanup");
         let _ = fs::remove_file(&temporary);
         let _ = sync_parent_directory(&target);
         Ok(())
@@ -2942,7 +2946,9 @@ impl Database {
             return Err(Error::RecoveryRequired);
         }
         self.file.set_len(last_good_offset)?;
+        crash_pause_if("recovery_after_truncate_before_sync");
         self.file.sync_all()?;
+        crash_pause_if("recovery_after_sync");
         self.recovery_report = RecoveryReport {
             discarded_bytes: original_size - last_good_offset,
         };

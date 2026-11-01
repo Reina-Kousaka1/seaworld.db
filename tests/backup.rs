@@ -368,7 +368,7 @@ proptest::proptest! {
 
 #[cfg(feature = "crash-test")]
 #[test]
-fn interrupted_backup_never_publishes_a_partial_destination() {
+fn interrupted_backup_or_compaction_never_publishes_a_partial_destination() {
     use std::{
         process::Command,
         thread,
@@ -385,45 +385,56 @@ fn interrupted_backup_never_publishes_a_partial_destination() {
     database.close().unwrap();
     let prior_bytes = fs::read(&prior).unwrap();
 
-    for (index, point) in [
-        "compaction_after_create",
-        "transaction_during_first_operation",
-        "compaction_before_publish",
-    ]
-    .iter()
-    .enumerate()
-    {
-        let target = dir.path(&format!("interrupted-{index}.seaworld.db"));
-        let ready = dir.path(&format!("ready-{index}"));
-        let mut child = Command::new(env!("CARGO_BIN_EXE_crash_writer"))
-            .arg(&source)
-            .arg("--backup")
-            .arg(&target)
-            .env("SEAWORLD_CRASH_AT", point)
-            .env("SEAWORLD_CRASH_READY_FILE", &ready)
-            .spawn()
-            .unwrap();
-        let deadline = Instant::now() + Duration::from_secs(10);
-        loop {
-            if let Some(status) = child.try_wait().unwrap() {
-                panic!("backup process exited before {point}: {status}");
+    for mode in ["--backup", "--compact"] {
+        for (index, point) in [
+            "compaction_after_create",
+            "transaction_during_first_operation",
+            "compaction_before_publish",
+            "compaction_after_publish_before_directory_sync",
+            "compaction_after_directory_sync_before_cleanup",
+        ]
+        .iter()
+        .enumerate()
+        {
+            let target = dir.path(&format!("{mode}-{index}.seaworld.db"));
+            let ready = dir.path(&format!("ready-{mode}-{index}"));
+            let mut child = Command::new(env!("CARGO_BIN_EXE_crash_writer"))
+                .arg(&source)
+                .arg(mode)
+                .arg(&target)
+                .env("SEAWORLD_CRASH_AT", point)
+                .env("SEAWORLD_CRASH_READY_FILE", &ready)
+                .spawn()
+                .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            loop {
+                if let Some(status) = child.try_wait().unwrap() {
+                    panic!("{mode} process exited before {point}: {status}");
+                }
+                if ready.exists() {
+                    child.kill().unwrap();
+                    child.wait().unwrap();
+                    break;
+                }
+                if Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    panic!("{mode} process did not reach {point}");
+                }
+                thread::sleep(Duration::from_millis(10));
             }
-            if ready.exists() {
-                child.kill().unwrap();
-                child.wait().unwrap();
-                break;
+            if point.starts_with("compaction_after_publish") {
+                let copy = Database::open_reader(&target).unwrap();
+                copy.check_integrity().unwrap();
+                assert_eq!(copy.document_ids("users").unwrap().len(), 1);
+                copy.close().unwrap();
+            } else {
+                assert!(!target.exists(), "{mode} published target at {point}");
             }
-            if Instant::now() >= deadline {
-                let _ = child.kill();
-                let _ = child.wait();
-                panic!("backup process did not reach {point}");
-            }
-            thread::sleep(Duration::from_millis(10));
+            assert_eq!(fs::read(&prior).unwrap(), prior_bytes);
+            Database::verify_backup(&prior).unwrap();
+            let source_db = Database::open_reader(&source).unwrap();
+            assert_eq!(source_db.document_ids("users").unwrap().len(), 1);
         }
-        assert!(!target.exists());
-        assert_eq!(fs::read(&prior).unwrap(), prior_bytes);
-        Database::verify_backup(&prior).unwrap();
-        let source_db = Database::open_reader(&source).unwrap();
-        assert_eq!(source_db.document_ids("users").unwrap().len(), 1);
     }
 }

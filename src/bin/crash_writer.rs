@@ -15,7 +15,7 @@ fn main() {
     let mut arguments = env::args_os().skip(1);
     let Some(database_path) = arguments.next().map(PathBuf::from) else {
         eprintln!(
-            "usage: crash_writer <database-path> [--recover|--backup TARGET|--bulk-update|--bulk-delete|--upsert|--mixed-transaction|--compare-and-set]"
+            "usage: crash_writer <database-path> [--recover|--backup TARGET|--compact TARGET|--bulk-update|--bulk-delete|--upsert|--mixed-transaction|--compare-and-set]"
         );
         process::exit(2);
     };
@@ -43,6 +43,20 @@ fn main() {
         if let Err(error) = database.backup(target).and_then(|()| database.close()) {
             eprintln!("could not create backup: {error}");
             process::exit(7);
+        }
+        return;
+    }
+    if mode.as_deref().is_some_and(|value| value == "--compact") {
+        let Some(target) = arguments.next().map(PathBuf::from) else {
+            eprintln!("compact mode requires a destination path");
+            process::exit(2);
+        };
+        if let Err(error) = database
+            .write_compacted_copy(target)
+            .and_then(|()| database.close())
+        {
+            eprintln!("could not create compacted copy: {error}");
+            process::exit(8);
         }
         return;
     }

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #![forbid(unsafe_code)]
 use std::{
-    fs,
+    fs::{self, OpenOptions},
+    io::Write,
     path::PathBuf,
     process::{Command, ExitStatus},
     sync::atomic::{AtomicU64, Ordering},
@@ -82,6 +83,10 @@ fn empty_database(path: &PathBuf) {
 
 fn empty_v2_database(path: &PathBuf) {
     Database::create_v2(path).unwrap().close().unwrap();
+}
+
+fn empty_v1_database(path: &PathBuf) {
+    Database::create_v1(path).unwrap().close().unwrap();
 }
 
 #[test]
@@ -227,4 +232,27 @@ fn recovery_can_be_interrupted_and_repeated() {
     let database = Database::open(temp.path()).unwrap();
     assert_eq!(database.recovery_report().discarded_bytes(), 0);
     assert!(database.collection_names().unwrap().is_empty());
+}
+
+#[test]
+fn legacy_v1_tail_recovery_can_be_interrupted_at_each_sync_boundary() {
+    for point in ["recovery_after_truncate_before_sync", "recovery_after_sync"] {
+        let temp = TempDatabase::new();
+        empty_v1_database(temp.path());
+        OpenOptions::new()
+            .append(true)
+            .open(temp.path())
+            .unwrap()
+            .write_all(b"SWB")
+            .unwrap();
+
+        assert!(
+            !kill_process(&temp, point, true).success(),
+            "V1 recovery did not stop at {point}"
+        );
+        let database = Database::open(temp.path()).unwrap();
+        assert!(database.collection_names().unwrap().is_empty());
+        assert_eq!(database.recovery_report().discarded_bytes(), 0);
+        database.close().unwrap();
+    }
 }
