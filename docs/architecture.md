@@ -79,10 +79,14 @@ observation, `optimization_metrics` returns an owned metric snapshot, and
 `optimization_recommendations` returns non-binding suggestions. When enabled,
 it counts collection reads,
 committed document writes, full scans, primary-ID lookups, secondary-index
-lookups, and range scans. It can produce explainable suggestions after bounded
-thresholds: a repeated full-scan comparison path can be marked as a candidate
-for a manually considered index, and a repeatedly mutated document can be
-marked as a potential hot target.
+lookups, range scans, compare-and-set attempts, and failed compare-and-set
+conditions. It can produce explainable suggestions after bounded thresholds: a
+repeated full-scan comparison path can be marked as a candidate for a manually
+considered index, a repeatedly mutated document can be marked as a potential
+hot target, and repeated failed CAS conditions can identify a possible
+contention target. Fine-grained path and document candidate maps are capped at
+1,024 entries each; aggregate collection counters continue and explicitly
+report dropped candidate observations after those bounds.
 
 This component is not telemetry: it has no network path, is disabled by
 default, is never written to a SeaWorld file, and is cleared on reopen. It is
@@ -92,7 +96,9 @@ work, or change transaction semantics. It deliberately does not recommend
 array-element indexes because multikey indexing has no approved SeaWorld
 architecture. Admission control, workload scheduling, shard-local
 execution, shard-per-core ownership, cluster operation, replication, and
-automatic physical representations remain future architecture work.
+automatic physical representations remain future architecture work. In
+particular, the diagnostics do not create multi-writer conflict detection or
+retry semantics; the current transaction core remains one writer at a time.
 
 ## Integrity and trust boundaries
 
