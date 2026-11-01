@@ -21,7 +21,10 @@ mod update;
 
 pub use advisor::{
     CAS_CONTENTION_THRESHOLD, CollectionObservation, HOT_DOCUMENT_WRITE_THRESHOLD,
-    INDEX_RECOMMENDATION_SCAN_THRESHOLD, OptimizationMetrics, OptimizationRecommendation,
+    INDEX_RECOMMENDATION_SCAN_THRESHOLD, OptimizationCandidate, OptimizationCandidateKind,
+    OptimizationEffect, OptimizationEvidence, OptimizationLevel, OptimizationMetrics,
+    OptimizationRationale, OptimizationRecommendation, OptimizationSimulation, OptimizationTarget,
+    OptimizationWorkloadProfile,
 };
 pub use api::{
     API_VERSION, ApiInfo, Capabilities, EngineHealth, OperationContext, PublicEngine,

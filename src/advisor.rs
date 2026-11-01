@@ -27,6 +27,17 @@ pub const CAS_CONTENTION_THRESHOLD: u64 = 8;
 const MAX_OBSERVED_SCAN_PATHS: usize = 1_024;
 const MAX_OBSERVED_DOCUMENTS: usize = 1_024;
 
+/// A qualitative estimate. SeaWorld deliberately does not manufacture timing,
+/// storage, or throughput figures from handle-local diagnostic observations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OptimizationLevel {
+    Unknown,
+    Low,
+    Moderate,
+    High,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct CollectionObservation {
@@ -48,6 +59,103 @@ pub struct OptimizationMetrics {
     pub collections: BTreeMap<String, CollectionObservation>,
     pub dropped_scan_path_candidates: u64,
     pub dropped_document_candidates: u64,
+}
+
+/// A bounded, owned summary of the observations available to the advisor.
+///
+/// It contains aggregate counters and candidate-map occupancy, not recorded
+/// queries, query values, documents, or any persistent database state.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct OptimizationWorkloadProfile {
+    pub enabled: bool,
+    pub collections: BTreeMap<String, CollectionObservation>,
+    pub observed_scan_paths: usize,
+    pub scan_path_capacity: usize,
+    pub observed_documents: usize,
+    pub document_capacity: usize,
+    pub dropped_scan_path_candidates: u64,
+    pub dropped_document_candidates: u64,
+}
+
+/// The kind of read-only optimization candidate derived from observations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OptimizationCandidateKind {
+    SecondaryAccessPath,
+    HotDocumentWarning,
+    CompareAndSetContentionWarning,
+}
+
+/// The logical target named by a candidate without exposing storage handles.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OptimizationTarget {
+    CollectionPath {
+        collection: String,
+        path: FieldPath,
+    },
+    Document {
+        collection: String,
+        id: DocumentId,
+    },
+}
+
+/// Structured explanation for why a candidate exists.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OptimizationRationale {
+    RepeatedFullScanPath,
+    RepeatedCommittedDocumentWrites,
+    RepeatedCompareAndSetFailures,
+}
+
+/// The observed counters that support one optimization candidate.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct OptimizationEvidence {
+    pub collection_reads: u64,
+    pub collection_writes: u64,
+    pub collection_full_scans: u64,
+    pub matching_full_scans: u64,
+    pub committed_document_writes: u64,
+    pub compare_and_set_attempts: u64,
+    pub compare_and_set_failures: u64,
+}
+
+/// A non-binding, explainable candidate; creating it never changes the engine.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct OptimizationCandidate {
+    pub kind: OptimizationCandidateKind,
+    pub target: OptimizationTarget,
+    pub rationale: OptimizationRationale,
+    pub evidence: OptimizationEvidence,
+    pub estimated_benefit: OptimizationLevel,
+    pub estimated_cost: OptimizationLevel,
+    pub confidence: OptimizationLevel,
+}
+
+/// A directional result of evaluating a candidate without applying it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OptimizationEffect {
+    Unknown,
+    NoExpectedChange,
+    Reduced,
+    Increased,
+    Improved,
+}
+
+/// Read-only qualitative simulation of a candidate's possible effects.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct OptimizationSimulation {
+    pub candidate: OptimizationCandidate,
+    pub scan_pressure: OptimizationEffect,
+    pub lookup_efficiency: OptimizationEffect,
+    pub write_maintenance: OptimizationEffect,
+    pub storage_footprint: OptimizationEffect,
 }
 
 /// An explainable observation-derived suggestion. The advisor never applies it.
@@ -95,6 +203,19 @@ impl OptimizationObserver {
 
     pub(crate) fn metrics(&self) -> OptimizationMetrics {
         self.metrics.clone()
+    }
+
+    pub(crate) fn workload_profile(&self) -> OptimizationWorkloadProfile {
+        OptimizationWorkloadProfile {
+            enabled: self.enabled(),
+            collections: self.metrics.collections.clone(),
+            observed_scan_paths: self.full_scan_paths.len(),
+            scan_path_capacity: MAX_OBSERVED_SCAN_PATHS,
+            observed_documents: self.documents.len(),
+            document_capacity: MAX_OBSERVED_DOCUMENTS,
+            dropped_scan_path_candidates: self.metrics.dropped_scan_path_candidates,
+            dropped_document_candidates: self.metrics.dropped_document_candidates,
+        }
     }
 
     pub(crate) fn record_query(&mut self, query: &Query, plan: &QueryPlan) {
@@ -236,6 +357,115 @@ impl OptimizationObserver {
         recommendations
     }
 
+    pub(crate) fn candidates(&self) -> Vec<OptimizationCandidate> {
+        if !self.enabled() {
+            return Vec::new();
+        }
+        let mut candidates = Vec::new();
+        for ((collection, path), matching_full_scans) in &self.full_scan_paths {
+            if *matching_full_scans < INDEX_RECOMMENDATION_SCAN_THRESHOLD {
+                continue;
+            }
+            let metrics = self.collection_metrics(collection);
+            candidates.push(OptimizationCandidate {
+                kind: OptimizationCandidateKind::SecondaryAccessPath,
+                target: OptimizationTarget::CollectionPath {
+                    collection: collection.clone(),
+                    path: path.clone(),
+                },
+                rationale: OptimizationRationale::RepeatedFullScanPath,
+                evidence: OptimizationEvidence {
+                    collection_reads: metrics.reads,
+                    collection_writes: metrics.writes,
+                    collection_full_scans: metrics.full_scans,
+                    matching_full_scans: *matching_full_scans,
+                    ..OptimizationEvidence::default()
+                },
+                estimated_benefit: scan_benefit(*matching_full_scans),
+                estimated_cost: index_cost(metrics.writes, *matching_full_scans),
+                confidence: confidence(*matching_full_scans, self.scan_candidates_complete()),
+            });
+        }
+        for ((collection, id), observation) in &self.documents {
+            let metrics = self.collection_metrics(collection);
+            if observation.committed_writes >= HOT_DOCUMENT_WRITE_THRESHOLD {
+                candidates.push(OptimizationCandidate {
+                    kind: OptimizationCandidateKind::HotDocumentWarning,
+                    target: OptimizationTarget::Document {
+                        collection: collection.clone(),
+                        id: *id,
+                    },
+                    rationale: OptimizationRationale::RepeatedCommittedDocumentWrites,
+                    evidence: OptimizationEvidence {
+                        collection_reads: metrics.reads,
+                        collection_writes: metrics.writes,
+                        collection_full_scans: metrics.full_scans,
+                        committed_document_writes: observation.committed_writes,
+                        ..OptimizationEvidence::default()
+                    },
+                    estimated_benefit: OptimizationLevel::Unknown,
+                    estimated_cost: OptimizationLevel::Unknown,
+                    confidence: confidence(
+                        observation.committed_writes,
+                        self.document_candidates_complete(),
+                    ),
+                });
+            }
+            if observation.compare_and_set_failures >= CAS_CONTENTION_THRESHOLD {
+                candidates.push(OptimizationCandidate {
+                    kind: OptimizationCandidateKind::CompareAndSetContentionWarning,
+                    target: OptimizationTarget::Document {
+                        collection: collection.clone(),
+                        id: *id,
+                    },
+                    rationale: OptimizationRationale::RepeatedCompareAndSetFailures,
+                    evidence: OptimizationEvidence {
+                        collection_reads: metrics.reads,
+                        collection_writes: metrics.writes,
+                        collection_full_scans: metrics.full_scans,
+                        compare_and_set_attempts: metrics.compare_and_set_attempts,
+                        compare_and_set_failures: observation.compare_and_set_failures,
+                        ..OptimizationEvidence::default()
+                    },
+                    estimated_benefit: OptimizationLevel::Unknown,
+                    estimated_cost: OptimizationLevel::Unknown,
+                    confidence: confidence(
+                        observation.compare_and_set_failures,
+                        self.document_candidates_complete(),
+                    ),
+                });
+            }
+        }
+        candidates
+    }
+
+    pub(crate) fn simulations(&self) -> Vec<OptimizationSimulation> {
+        self.candidates()
+            .into_iter()
+            .map(|candidate| {
+                let index_candidate = matches!(
+                    candidate.kind,
+                    OptimizationCandidateKind::SecondaryAccessPath
+                );
+                OptimizationSimulation {
+                    candidate,
+                    scan_pressure: index_candidate
+                        .then_some(OptimizationEffect::Reduced)
+                        .unwrap_or(OptimizationEffect::Unknown),
+                    lookup_efficiency: index_candidate
+                        .then_some(OptimizationEffect::Improved)
+                        .unwrap_or(OptimizationEffect::Unknown),
+                    write_maintenance: index_candidate
+                        .then_some(OptimizationEffect::Increased)
+                        .unwrap_or(OptimizationEffect::Unknown),
+                    storage_footprint: index_candidate
+                        .then_some(OptimizationEffect::Increased)
+                        .unwrap_or(OptimizationEffect::Unknown),
+                }
+            })
+            .collect()
+    }
+
     fn document_observation(
         &mut self,
         collection: String,
@@ -253,6 +483,50 @@ impl OptimizationObserver {
         self.documents
             .insert(key.clone(), DocumentObservation::default());
         self.documents.get_mut(&key)
+    }
+
+    fn collection_metrics(&self, collection: &str) -> CollectionObservation {
+        self.metrics
+            .collections
+            .get(collection)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    fn scan_candidates_complete(&self) -> bool {
+        self.metrics.dropped_scan_path_candidates == 0
+    }
+
+    fn document_candidates_complete(&self) -> bool {
+        self.metrics.dropped_document_candidates == 0
+    }
+}
+
+fn scan_benefit(observations: u64) -> OptimizationLevel {
+    if observations >= INDEX_RECOMMENDATION_SCAN_THRESHOLD.saturating_mul(4) {
+        OptimizationLevel::High
+    } else {
+        OptimizationLevel::Moderate
+    }
+}
+
+fn index_cost(writes: u64, matching_full_scans: u64) -> OptimizationLevel {
+    if writes == 0 {
+        OptimizationLevel::Low
+    } else if writes <= matching_full_scans {
+        OptimizationLevel::Moderate
+    } else {
+        OptimizationLevel::High
+    }
+}
+
+fn confidence(observations: u64, complete: bool) -> OptimizationLevel {
+    if !complete {
+        OptimizationLevel::Low
+    } else if observations >= INDEX_RECOMMENDATION_SCAN_THRESHOLD.saturating_mul(4) {
+        OptimizationLevel::High
+    } else {
+        OptimizationLevel::Moderate
     }
 }
 
@@ -322,6 +596,126 @@ mod tests {
     }
 
     #[test]
+    fn repeated_full_scans_produce_a_qualitative_read_only_simulation() {
+        let path = FieldPath::parse("account_id").unwrap();
+        let query = Query::new(
+            "transactions",
+            Filter::Compare {
+                path: path.clone(),
+                op: CompareOp::Eq,
+                value: Value::Integer(7),
+            },
+        );
+        let plan = QueryPlan::FullScan {
+            collection: "transactions".into(),
+        };
+        let mut observer = OptimizationObserver::default();
+        observer.set_enabled(true);
+        for _ in 0..INDEX_RECOMMENDATION_SCAN_THRESHOLD {
+            observer.record_query(&query, &plan);
+        }
+
+        let profile = observer.workload_profile();
+        assert_eq!(profile.observed_scan_paths, 1);
+        assert_eq!(profile.scan_path_capacity, MAX_OBSERVED_SCAN_PATHS);
+        let candidates = observer.candidates();
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].kind, OptimizationCandidateKind::SecondaryAccessPath);
+        assert_eq!(
+            candidates[0].target,
+            OptimizationTarget::CollectionPath {
+                collection: "transactions".into(),
+                path,
+            }
+        );
+        assert_eq!(
+            candidates[0].rationale,
+            OptimizationRationale::RepeatedFullScanPath
+        );
+        assert_eq!(candidates[0].evidence.matching_full_scans, 8);
+        assert_eq!(candidates[0].estimated_benefit, OptimizationLevel::Moderate);
+        assert_eq!(candidates[0].estimated_cost, OptimizationLevel::Low);
+        assert_eq!(candidates[0].confidence, OptimizationLevel::Moderate);
+
+        let simulations = observer.simulations();
+        assert_eq!(simulations.len(), 1);
+        assert_eq!(simulations[0].scan_pressure, OptimizationEffect::Reduced);
+        assert_eq!(
+            simulations[0].lookup_efficiency,
+            OptimizationEffect::Improved
+        );
+        assert_eq!(
+            simulations[0].write_maintenance,
+            OptimizationEffect::Increased
+        );
+        assert_eq!(
+            simulations[0].storage_footprint,
+            OptimizationEffect::Increased
+        );
+
+        for _ in 0..INDEX_RECOMMENDATION_SCAN_THRESHOLD.saturating_mul(3) {
+            observer.record_query(&query, &plan);
+        }
+        let well_observed = observer.candidates();
+        assert_eq!(well_observed[0].estimated_benefit, OptimizationLevel::High);
+        assert_eq!(well_observed[0].confidence, OptimizationLevel::High);
+    }
+
+    #[test]
+    fn incomplete_scan_candidate_observation_lowers_confidence() {
+        let target_path = FieldPath::parse("target").unwrap();
+        let target = Query::new(
+            "events",
+            Filter::Compare {
+                path: target_path.clone(),
+                op: CompareOp::Eq,
+                value: Value::Integer(1),
+            },
+        );
+        let plan = QueryPlan::FullScan {
+            collection: "events".into(),
+        };
+        let mut observer = OptimizationObserver::default();
+        observer.set_enabled(true);
+        for _ in 0..INDEX_RECOMMENDATION_SCAN_THRESHOLD {
+            observer.record_query(&target, &plan);
+        }
+        for value in 0..=MAX_OBSERVED_SCAN_PATHS {
+            let query = Query::new(
+                "events",
+                Filter::Compare {
+                    path: FieldPath::parse(&format!("field_{value}")).unwrap(),
+                    op: CompareOp::Eq,
+                    value: Value::Integer(value as i64),
+                },
+            );
+            observer.record_query(&query, &plan);
+        }
+        let candidate = observer
+            .candidates()
+            .into_iter()
+            .find(|candidate| matches!(
+                &candidate.target,
+                OptimizationTarget::CollectionPath { collection, path }
+                    if collection == "events" && path == &target_path
+            ))
+            .unwrap();
+        assert_eq!(candidate.confidence, OptimizationLevel::Low);
+        assert!(observer.workload_profile().dropped_scan_path_candidates > 0);
+    }
+
+    #[test]
+    fn frequent_primary_reads_are_not_misclassified_as_document_contention() {
+        let mut observer = OptimizationObserver::default();
+        observer.set_enabled(true);
+        for _ in 0..100 {
+            observer.record_primary_read("accounts");
+        }
+        assert!(observer.candidates().is_empty());
+        assert!(observer.simulations().is_empty());
+    }
+
+    #[test]
     fn contention_candidates_are_bounded_and_explainable() {
         let mut observer = OptimizationObserver::default();
         observer.set_enabled(true);
@@ -356,6 +750,9 @@ mod tests {
         for value in 1..=MAX_OBSERVED_DOCUMENTS + 1 {
             observer.record_committed_write("other".into(), DocumentId::new(value as i64).unwrap());
         }
-        assert!(observer.metrics().dropped_document_candidates > 0);
+        let profile = observer.workload_profile();
+        assert_eq!(profile.observed_documents, MAX_OBSERVED_DOCUMENTS);
+        assert_eq!(profile.document_capacity, MAX_OBSERVED_DOCUMENTS);
+        assert!(profile.dropped_document_candidates > 0);
     }
 }

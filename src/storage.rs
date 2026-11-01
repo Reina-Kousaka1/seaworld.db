@@ -342,6 +342,32 @@ impl Database {
         self.optimization_observer.borrow().recommendations()
     }
 
+    /// Returns a bounded, owned summary of the locally observed workload.
+    ///
+    /// The profile is read-only, is reset on reopen, and intentionally omits
+    /// document contents, query values, and storage internals.
+    pub fn optimization_workload_profile(&self) -> crate::OptimizationWorkloadProfile {
+        self.optimization_observer.borrow().workload_profile()
+    }
+
+    /// Returns non-binding candidates with structured evidence and qualitative
+    /// benefit, cost, and confidence estimates.
+    ///
+    /// This native diagnostic extension never creates an index or changes a
+    /// query plan, storage layout, transaction, lock, or database byte.
+    pub fn optimization_candidates(&self) -> Vec<crate::OptimizationCandidate> {
+        self.optimization_observer.borrow().candidates()
+    }
+
+    /// Evaluates all currently observed candidates without applying them.
+    ///
+    /// Simulations are qualitative and read-only. They describe possible
+    /// directions such as reduced scan pressure or increased index maintenance;
+    /// they are not a timing, cost-based planner, or storage-plan activation.
+    pub fn optimization_simulations(&self) -> Vec<crate::OptimizationSimulation> {
+        self.optimization_observer.borrow().simulations()
+    }
+
     /// Begins a stable V3 read snapshot that can outlive a mutable writer borrow.
     pub fn begin_read(&self) -> Result<Snapshot> {
         if self.format_version < MVCC_FORMAT_VERSION {
@@ -4125,6 +4151,43 @@ mod tests {
         assert_eq!(reopened.execute(&query).unwrap().len(), 1);
         assert!(reopened.optimization_metrics().collections.is_empty());
         drop(reopened);
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_file(sidecar_path(&path, ".writer.lock").unwrap());
+    }
+
+    #[test]
+    fn optimization_simulation_is_read_only_and_does_not_create_an_index() {
+        let path = observation_test_path();
+        let mut database = Database::create(&path).unwrap();
+        database.create_collection("events").unwrap();
+        database
+            .insert(
+                "events",
+                Document::empty().with("account", Value::Integer(7)),
+            )
+            .unwrap();
+        let query = Query::new(
+            "events",
+            Filter::Compare {
+                path: FieldPath::parse("account").unwrap(),
+                op: CompareOp::Eq,
+                value: Value::Integer(7),
+            },
+        );
+        let before = fs::read(&path).unwrap();
+
+        database.set_optimization_observation(true);
+        for _ in 0..crate::advisor::INDEX_RECOMMENDATION_SCAN_THRESHOLD {
+            assert_eq!(database.execute(&query).unwrap().len(), 1);
+        }
+        let candidates = database.optimization_candidates();
+        let simulations = database.optimization_simulations();
+
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(simulations.len(), 1);
+        assert!(database.indexes().unwrap().is_empty());
+        assert_eq!(fs::read(&path).unwrap(), before);
+        database.close().unwrap();
         let _ = fs::remove_file(&path);
         let _ = fs::remove_file(sidecar_path(&path, ".writer.lock").unwrap());
     }

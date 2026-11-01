@@ -81,6 +81,9 @@ distributed-system guarantees.
 - [x] Add an internal, opt-in, non-persistent observation foundation for query
   access paths and committed document writes. It only produces explainable
   candidate-index and hot-document recommendations.
+- [x] Add bounded workload profiles, evidence-bearing candidates, and
+  read-only qualitative simulations. They never apply index, storage, or plan
+  changes and are not a cost-based or autonomous optimizer.
 - [x] Add a native, one-writer atomic compare-and-set extension that evaluates
   against the staged view and persists through the established transaction
   batch; this is not a multi-writer conflict protocol.
@@ -88,6 +91,9 @@ distributed-system guarantees.
   merge, append, field-level conflict tracking, or durable idempotency.
 - [ ] Decide whether any automatic index/storage adaptation is safe enough for
   a future administrative policy; the current advisor never makes changes.
+- [ ] Design a versioned persistent storage-plan format, explicit administrative
+  apply/verify/rollback workflow, and workload-drift policy before any future
+  plan activation.
 
 ## Explicitly out of scope
 

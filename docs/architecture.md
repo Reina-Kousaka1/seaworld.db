@@ -75,7 +75,8 @@ One exclusive writer handle and any fixed read-only handles are supported. The w
 
 SeaWorld has an opt-in, handle-local native diagnostic component for future
 adaptive-engine work. `Database::set_optimization_observation(true)` enables
-observation, `optimization_metrics` returns an owned metric snapshot, and
+observation, `optimization_metrics` returns an owned metric snapshot,
+`optimization_workload_profile` returns a bounded aggregate profile, and
 `optimization_recommendations` returns non-binding suggestions. When enabled,
 it counts collection reads,
 committed document writes, full scans, primary-ID lookups, secondary-index
@@ -88,6 +89,17 @@ contention target. Fine-grained path and document candidate maps are capped at
 1,024 entries each; aggregate collection counters continue and explicitly
 report dropped candidate observations after those bounds.
 
+`optimization_candidates` turns the observations into structured evidence:
+candidate kind and target, observed counters, qualitative expected benefit,
+expected cost, and confidence. `optimization_simulations` evaluates exactly
+those candidates without applying them. A repeated full-scan path can report a
+possible reduction in scan pressure and improvement in lookup efficiency,
+alongside possible increased write maintenance and storage use. These are
+directional `Unknown`/`Low`/`Moderate`/`High` classifications, not latency,
+disk, or throughput predictions. Candidates are less confident when a bounded
+candidate map has dropped observations. Hot-document and CAS-contention
+candidates remain warnings: SeaWorld has no approved automatic action for them.
+
 This component is not telemetry: it has no network path, is disabled by
 default, is never written to a SeaWorld file, and is cleared on reopen. It is
 outside the transport-neutral `PublicEngine` contract. It does not create
@@ -99,6 +111,8 @@ execution, shard-per-core ownership, cluster operation, replication, and
 automatic physical representations remain future architecture work. In
 particular, the diagnostics do not create multi-writer conflict detection or
 retry semantics; the current transaction core remains one writer at a time.
+There is no persistent storage-plan format, plan activation, plan rollback,
+workload-drift detector, or autonomous query optimizer in this phase.
 
 ## Integrity and trust boundaries
 

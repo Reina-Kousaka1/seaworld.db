@@ -152,6 +152,16 @@ are neither network telemetry nor a backend requirement. Their metrics and
 recommendations are in-memory only, reset on reopen, and can never create an
 index, change a plan, mutate storage, or alter transaction results.
 
+`optimization_workload_profile` exposes bounded aggregate occupancy and
+counters without retaining queries, values, or documents. The two candidate
+maps are capped at 1,024 scan paths and 1,024 documents. `optimization_candidates`
+returns structured evidence plus qualitative benefit, cost, and confidence;
+`optimization_simulations` evaluates those candidates read-only. A simulation
+does not create an index, write a storage plan, modify a file, or make a
+candidate active. Its directional effects are intentionally qualitative rather
+than fabricated timing or disk estimates. This remains a native diagnostic
+extension, not a stable `PublicEngine` capability or an autonomous optimizer.
+
 ## Native transaction extensions
 
 `Transaction::compare_and_set` and `Transaction::snapshot_version` are native
