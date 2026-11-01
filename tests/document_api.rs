@@ -510,7 +510,7 @@ fn compare_and_set_uses_the_staged_view_and_is_reopen_safe() {
                 id,
                 claim,
                 CompareAndSetExpectation::Value(Value::Null),
-                Value::Boolean(true),
+                Value::Bool(true),
             )
             .unwrap(),
         CompareAndSetResult::Updated
@@ -536,7 +536,7 @@ fn compare_and_set_uses_the_staged_view_and_is_reopen_safe() {
     let reopened = Database::open_reader(&temp.0).unwrap();
     let document = reopened.get("accounts", id).unwrap().unwrap();
     assert_eq!(document.get("balance"), Some(&Value::Integer(800)));
-    assert_eq!(document.get("claim"), Some(&Value::Boolean(true)));
+    assert_eq!(document.get("claim"), Some(&Value::Bool(true)));
 }
 
 #[test]
