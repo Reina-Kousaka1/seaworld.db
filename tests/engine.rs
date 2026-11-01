@@ -968,7 +968,10 @@ fn compacted_copy_preserves_the_source_format_from_v1_through_v4() {
             source_format,
             "V{source_format} compacted copy changed file format"
         );
-        assert_eq!(compacted.get("users", id).unwrap(), Some(&sample_document()));
+        assert_eq!(
+            compacted.get("users", id).unwrap(),
+            Some(&sample_document())
+        );
         if source_format == 4 {
             let indexes = compacted.indexes().unwrap();
             assert_eq!(indexes.len(), 1);
