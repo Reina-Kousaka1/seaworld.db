@@ -2449,7 +2449,10 @@ impl Database {
                 "committed transaction identifier is out of order".into(),
             ));
         }
-        let mut transaction = Transaction::new(self, id);
+        let snapshot_version = (self.format_version >= MVCC_FORMAT_VERSION)
+            .then(|| self.current_version())
+            .transpose()?;
+        let mut transaction = Transaction::new(self, id, snapshot_version);
         for operation in operations {
             let result = match operation {
                 StagedOperation::CollectionCreate {
