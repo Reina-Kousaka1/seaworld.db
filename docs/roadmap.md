@@ -70,6 +70,23 @@ distributed-system guarantees.
 4. Expand concurrency and corruption stress coverage for B+Tree roots, snapshot history, lock contention, compaction, and recovery.
 5. Add fuzz targets and storage-format golden fixtures, then reproducible benchmarks after correctness and crash recovery are established.
 
+## Transaction fabric and adaptive optimization baseline
+
+- [x] Preserve the existing single-writer transaction kernel, commit ordering,
+  MVCC snapshots, checksummed log, recovery, and V1--V4 compatibility rather
+  than layering a second transaction log over it.
+- [x] Document typed numeric add/subtract behavior through the existing
+  `Increment`/`Decrement` document operations and retain transaction-wide
+  atomicity for those mutations.
+- [x] Add an internal, opt-in, non-persistent observation foundation for query
+  access paths and committed document writes. It only produces explainable
+  candidate-index and hot-document recommendations.
+- [ ] Design a multi-writer conflict model before adding retries, commutative
+  merge, compare-and-set, append, field-level conflict tracking, or durable
+  idempotency.
+- [ ] Decide whether any automatic index/storage adaptation is safe enough for
+  a future administrative policy; the current advisor never makes changes.
+
 ## Explicitly out of scope
 
 Clustering, sharding, consensus, replication, cloud service, MongoDB/PostgreSQL wire protocols, full SQL, ORM, GUI, admin dashboard, Kubernetes operator, a custom programming language, and Tyvera-specific runtime dependencies.

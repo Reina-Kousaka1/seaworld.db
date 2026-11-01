@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 use std::{
+    cell::RefCell,
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet, HashMap},
     fs::{self, File, OpenOptions, TryLockError},
@@ -23,6 +24,7 @@ use crate::{
     mvcc::{CommitVersion, MvccStore, Snapshot},
     query::{self, CompareOp, Filter, MAX_QUERY_RESULTS, SortDirection},
 };
+use crate::advisor::OptimizationObserver;
 
 /// Maximum supported file size for current SeaWorld database formats.
 pub const MAX_DATABASE_BYTES: u64 = format::MAX_DATABASE_SIZE_BYTES;
@@ -109,6 +111,7 @@ pub struct Database {
     write_failed: bool,
     recovery_report: RecoveryReport,
     mvcc: Arc<MvccStore>,
+    optimization_observer: RefCell<OptimizationObserver>,
 }
 
 impl Database {
@@ -265,6 +268,7 @@ impl Database {
             write_failed: false,
             recovery_report: RecoveryReport::default(),
             mvcc: Arc::new(MvccStore::default()),
+            optimization_observer: RefCell::new(OptimizationObserver::default()),
         }
     }
 
@@ -310,6 +314,15 @@ impl Database {
     /// Returns the current committed version ordinal.
     pub fn current_version(&self) -> Result<CommitVersion> {
         self.mvcc.current_version()
+    }
+
+    /// Enables or disables local in-memory workload observation.
+    ///
+    /// Observation is opt-in, is not persisted, and never changes query plans,
+    /// transactions, indexes, storage layout, or database bytes. The collected
+    /// data is an internal foundation for later advisor work, not telemetry.
+    pub(crate) fn set_optimization_observation(&mut self, enabled: bool) {
+        self.optimization_observer.borrow_mut().set_enabled(enabled);
     }
 
     /// Begins a stable V3 read snapshot that can outlive a mutable writer borrow.
@@ -605,6 +618,9 @@ impl Database {
     pub fn get(&self, collection_name: &str, id: DocumentId) -> Result<Option<&Document>> {
         self.check_usable()?;
         let collection_id = self.collection_id(collection_name)?;
+        self.optimization_observer
+            .borrow_mut()
+            .record_primary_read(collection_name);
         if self.primary_id_index.get(&id.value()) != Some(&collection_id) {
             return Ok(None);
         }
@@ -944,6 +960,9 @@ impl Database {
     /// Executes a native query and returns borrowed documents in deterministic order.
     pub fn execute(&self, query: &Query) -> Result<Vec<QueryRow<'_>>> {
         let plan = self.explain(query)?;
+        self.optimization_observer
+            .borrow_mut()
+            .record_query(query, &plan);
         let collection_id = self.collection_id(query.collection())?;
         let mut candidates: Vec<DocumentId> = match &plan {
             QueryPlan::PrimaryKeyLookup { id, .. } => {
@@ -1619,6 +1638,19 @@ impl Database {
                 self.write_failed = true;
                 return Err(error);
             }
+        }
+        let mut writes = Vec::with_capacity(overlay.len());
+        for (document_id, entry) in overlay {
+            let name = self
+                .collection_names_by_id
+                .get(&entry.collection_id)
+                .ok_or_else(|| Error::Integrity("committed write names an unknown collection".into()))?
+                .clone();
+            writes.push((name, DocumentId(*document_id)));
+        }
+        let mut observer = self.optimization_observer.borrow_mut();
+        for (collection, id) in writes {
+            observer.record_committed_write(collection, id);
         }
         Ok(())
     }
@@ -3886,6 +3918,19 @@ fn crash_pause(_point: &str) -> ! {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{CompareOp, Document, FieldPath, Filter, Query, Value};
+    use std::{
+        fs,
+        path::PathBuf,
+        sync::atomic::{AtomicU64, Ordering},
+    };
+
+    static NEXT_OBSERVATION_TEST_ID: AtomicU64 = AtomicU64::new(1);
+
+    fn observation_test_path() -> PathBuf {
+        let id = NEXT_OBSERVATION_TEST_ID.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!("seaworld-observation-{id}.seaworld.db"))
+    }
 
     #[test]
     fn collection_validation_matches_ascii_name_grammar() {
@@ -3901,5 +3946,97 @@ mod tests {
         let record = encode_record(RecordType::CollectionCreate, 1, b"test").unwrap();
         let stored = u32::from_be_bytes(record[record.len() - 4..].try_into().unwrap());
         assert_eq!(stored, format::crc32c(&record[..record.len() - 4]));
+    }
+
+    #[test]
+    fn opt_in_observation_is_non_persistent_and_only_recommends() {
+        let path = observation_test_path();
+        let mut database = Database::create(&path).unwrap();
+        database.create_collection("events").unwrap();
+        let id = database
+            .insert(
+                "events",
+                Document::empty().with("account", Value::Integer(7)),
+            )
+            .unwrap();
+        let path_field = FieldPath::parse("account").unwrap();
+        let query = Query::new(
+            "events",
+            Filter::Compare {
+                path: path_field.clone(),
+                op: CompareOp::Eq,
+                value: Value::Integer(7),
+            },
+        );
+
+        for _ in 0..crate::advisor::INDEX_RECOMMENDATION_SCAN_THRESHOLD {
+            database.execute(&query).unwrap();
+        }
+        assert!(database
+            .optimization_observer
+            .borrow()
+            .recommendations()
+            .is_empty());
+
+        database.set_optimization_observation(true);
+        let mut rolled_back = database.begin_transaction().unwrap();
+        assert!(rolled_back
+            .update(
+                "events",
+                id,
+                Document::empty().with("account", Value::Integer(9)),
+            )
+            .unwrap());
+        rolled_back.rollback();
+        for _ in 0..crate::advisor::INDEX_RECOMMENDATION_SCAN_THRESHOLD {
+            database.execute(&query).unwrap();
+        }
+        for _ in 0..crate::advisor::HOT_DOCUMENT_WRITE_THRESHOLD {
+            database
+                .update(
+                    "events",
+                    id,
+                    Document::empty().with("account", Value::Integer(7)),
+                )
+                .unwrap();
+        }
+        database.create_index("events", "account").unwrap();
+        database.execute(&query).unwrap();
+        database.get("events", id).unwrap();
+        let recommendations = database.optimization_observer.borrow().recommendations();
+        assert!(recommendations.iter().any(|recommendation| matches!(
+            recommendation,
+            crate::advisor::OptimizationRecommendation::ConsiderIndex { collection, path, .. }
+                if collection == "events" && path == &path_field
+        )));
+        assert!(recommendations.iter().any(|recommendation| matches!(
+            recommendation,
+            crate::advisor::OptimizationRecommendation::PotentialHotDocument { collection, id: candidate, .. }
+                if collection == "events" && *candidate == id
+        )));
+        let metrics = database.optimization_observer.borrow().metrics();
+        assert_eq!(
+            metrics.collections["events"].full_scans,
+            crate::advisor::INDEX_RECOMMENDATION_SCAN_THRESHOLD
+        );
+        assert_eq!(
+            metrics.collections["events"].writes,
+            crate::advisor::HOT_DOCUMENT_WRITE_THRESHOLD
+        );
+        assert_eq!(metrics.collections["events"].secondary_index_lookups, 1);
+        assert_eq!(metrics.collections["events"].primary_key_lookups, 1);
+
+        database.close().unwrap();
+        let reopened = Database::open_reader(&path).unwrap();
+        assert_eq!(reopened.execute(&query).unwrap().len(), 1);
+        assert!(reopened
+            .optimization_observer
+            .borrow()
+            .metrics()
+            .collections
+            .is_empty());
+        drop(reopened);
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_file(sidecar_path(&path, ".writer.lock").unwrap());
     }
 }

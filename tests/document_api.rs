@@ -424,6 +424,48 @@ fn upsert_uses_explicit_insert_base_and_existing_match() {
 }
 
 #[test]
+fn sequential_add_mutations_preserve_each_committed_delta() {
+    let temp = TempDatabase::new();
+    let mut db = Database::create(&temp.0).unwrap();
+    db.create_collection("accounts").unwrap();
+    let id = db
+        .insert(
+            "accounts",
+            Document::empty().with("balance", Value::Integer(1_000)),
+        )
+        .unwrap();
+    let balance = FieldPath::parse("balance").unwrap();
+
+    let mut first = db.begin_transaction().unwrap();
+    assert!(first
+        .update_fields(
+            "accounts",
+            id,
+            &[DocumentOperation::Increment(
+                balance.clone(),
+                Value::Integer(-200),
+            )],
+        )
+        .unwrap());
+    first.commit().unwrap();
+
+    let mut second = db.begin_transaction().unwrap();
+    assert!(second
+        .update_fields(
+            "accounts",
+            id,
+            &[DocumentOperation::Increment(balance, Value::Integer(-300))],
+        )
+        .unwrap());
+    second.commit().unwrap();
+
+    assert_eq!(
+        db.get("accounts", id).unwrap().unwrap().get("balance"),
+        Some(&Value::Integer(500))
+    );
+}
+
+#[test]
 fn document_operations_survive_backup_restore_and_compaction() {
     let source = TempDatabase::new();
     let backup = TempDatabase::new();

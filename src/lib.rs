@@ -6,6 +6,7 @@
 //! V1/V2/V3 files remain readable; new databases use V4 persistent index pages.
 
 mod api;
+mod advisor;
 mod btree;
 mod codec;
 mod document;

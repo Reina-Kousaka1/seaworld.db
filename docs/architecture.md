@@ -71,6 +71,25 @@ A potential future WiredTiger backend and its unresolved responsibility boundari
 
 One exclusive writer handle and any fixed read-only handles are supported. The writer lock prevents a second cooperating writer; readers replay under a shared commit lock and then keep an in-memory view. V3 snapshots held by the writer retain a stable in-process view across commits. Lock enforcement is platform-dependent; another program may still modify the file outside SeaWorld's locking protocol. No isolation level beyond snapshot reads is promised. A future server can own one engine handle and schedule requests over a protocol without moving network concerns into storage code.
 
+## Adaptive optimization foundation
+
+SeaWorld has an internal, opt-in, handle-local observation component for future
+adaptive-engine work. When enabled by the engine, it counts collection reads,
+committed document writes, full scans, primary-ID lookups, secondary-index
+lookups, and range scans. It can produce explainable suggestions after bounded
+thresholds: a repeated full-scan comparison path can be marked as a candidate
+for a manually considered index, and a repeatedly mutated document can be
+marked as a potential hot target.
+
+This component is not telemetry: it has no network path, is disabled by
+default, is never written to a SeaWorld file, and is cleared on reopen. It does
+not create indexes, alter plans, force compaction, move data, serialize hot
+keys, schedule work, or change transaction semantics. It deliberately does not
+recommend array-element indexes because multikey indexing has no approved
+SeaWorld architecture. Admission control, workload scheduling, shard-local
+execution, shard-per-core ownership, cluster operation, replication, and
+automatic physical representations remain future architecture work.
+
 ## Integrity and trust boundaries
 
 Every persisted length is checked before allocation. The decoder limits record size, document size, nesting depth, collection-name size, field-name size, and element counts. UTF-8 decoding is strict. Header and record CRC32C checks detect accidental corruption; they are not authentication and do not protect against malicious modification. Invalid complete records fail open with a controlled error. Only an incomplete final record is recoverable, and its discarded byte count is exposed to the caller.

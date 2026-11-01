@@ -21,6 +21,46 @@ The engine writes the complete batch, synchronizes the file with `File::sync_all
 
 Transaction IDs are positive, monotonically allocated by committed transactions and persisted in log order. In V3, the public `CommitVersion` is a distinct type with the same numeric ordinal during normal operation. A rolled-back transaction writes nothing, so the next transaction may reuse its provisional ID. Overflow is an error. The log retains only the current pending transaction during replay; V2/V3 bound transactions to 10,000 operations and 64 MiB of encoded operation data.
 
+## Transaction-fabric baseline
+
+SeaWorld already has the small mutation kernel needed for its embedded model:
+
+```text
+Transaction
+  -> staged document/collection mutations and an overlay
+  -> validation, unique-index checks, and MVCC history admission
+  -> checksummed begin/mutation/page/root/commit log batch
+  -> File::sync_all()
+  -> in-memory document, MVCC, and index publication
+```
+
+The transaction ID identifies that concrete log batch. `RequestId` and
+`OperationContext` remain caller-supplied correlation metadata only; they are
+not transaction IDs and are not durable idempotency keys. In V3/V4 a successful
+transaction's log ordinal is the associated `CommitVersion`. An aborted or
+incomplete transaction has no committed version. SeaWorld does not currently
+expose automatic retry: a sync error or interrupted caller observation is
+outcome-ambiguous and the handle must be reopened before the application
+decides how to proceed.
+
+`DocumentOperation::Increment` and `DocumentOperation::Decrement` are typed
+numeric add/subtract mutations. They calculate from the transaction's staged
+view and are persisted atomically with the rest of that transaction. Therefore
+two *successive* committed increments of `-200` and `-300` from `1000` produce
+`500`, rather than losing one delta through an application-level read/replace
+cycle. The current engine permits one writer only, however: it does not provide
+multi-writer commutative mutation merging, field-level conflict detection,
+compare-and-set, append, or document merge semantics. Those require a separate
+conflict and storage-format design; they are not inferred from the existing
+increment operation.
+
+The current conflict boundary is consequently intentionally coarse. The writer
+lock and exclusive mutable database borrow serialize writes. A unique-index or
+resource/history-limit failure prevents the batch before append; any failed
+post-append I/O path fails the handle closed. SeaWorld does not claim field-path
+conflict detection, automatic retry, serializable isolation, predicate locks,
+or durable external idempotency.
+
 V3 adds in-process MVCC snapshots, bounded to 1,024 leases and 64 MiB of retained encoded document history. V4 retains those semantics. Read-only handles replay under a shared commit lock and then use a fixed in-memory view while one writer appends. An incomplete suffix discovered in read-only mode returns `RecoveryRequired`; only a writable open may truncate it. V3/V4 compaction refuses while snapshots remain active. MVCC history is rebuilt from the current committed state on reopen and is not retained across process restarts.
 
 V4 page records and root publications are staged with ordinary document operations. Replay validates the B+Tree pages and applies the root only after seeing the matching commit marker. A crash after page writes but before the commit marker discards the entire transaction from its begin record, leaving the previous root visible. This is process-crash behavior; it does not establish power-loss durability.
