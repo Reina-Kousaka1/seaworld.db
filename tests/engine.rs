@@ -935,6 +935,63 @@ fn compacted_copy_preserves_live_data_and_does_not_replace_the_source() {
 }
 
 #[test]
+fn compacted_copy_preserves_the_source_format_from_v1_through_v4() {
+    for source_format in 1..=4 {
+        let source = TempDatabase::new();
+        let target = TempDatabase::new();
+        let mut database = match source_format {
+            1 => Database::create_v1(&source.path).unwrap(),
+            2 => Database::create_v2(&source.path).unwrap(),
+            3 => Database::create_v3(&source.path).unwrap(),
+            4 => Database::create(&source.path).unwrap(),
+            _ => unreachable!(),
+        };
+        database.create_collection("users").unwrap();
+        let id = database.insert("users", sample_document()).unwrap();
+        if source_format == 4 {
+            database.create_index("users", "credits").unwrap();
+        }
+        let source_bytes = fs::read(&source.path).unwrap();
+
+        database.write_compacted_copy(&target.path).unwrap();
+
+        assert_eq!(
+            fs::read(&source.path).unwrap(),
+            source_bytes,
+            "V{source_format} source was modified"
+        );
+        database.close().unwrap();
+
+        let compacted = Database::open(&target.path).unwrap();
+        assert_eq!(
+            compacted.format_version(),
+            source_format,
+            "V{source_format} compacted copy changed file format"
+        );
+        assert_eq!(compacted.get("users", id).unwrap(), Some(&sample_document()));
+        if source_format == 4 {
+            let indexes = compacted.indexes().unwrap();
+            assert_eq!(indexes.len(), 1);
+            assert!(indexes[0].root_page_id.is_some());
+            let range = Query::new(
+                "users",
+                Filter::Compare {
+                    path: FieldPath::parse("credits").unwrap(),
+                    op: CompareOp::Gte,
+                    value: Value::Integer(1_000),
+                },
+            );
+            assert!(matches!(
+                compacted.explain(&range).unwrap(),
+                QueryPlan::SecondaryIndexRangeLookup { .. }
+            ));
+            assert_eq!(compacted.execute(&range).unwrap()[0].id, id);
+        }
+        compacted.close().unwrap();
+    }
+}
+
+#[test]
 fn compacted_copy_never_overwrites_its_destination_or_source() {
     let source = TempDatabase::new();
     let target = TempDatabase::new();
