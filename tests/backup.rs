@@ -120,6 +120,13 @@ fn backup_during_staged_transaction_restores_committed_state_and_watermarks() {
     let backup_db = Database::open_reader(&backup).unwrap();
     assert_eq!(backup_db.get("users", first).unwrap(), Some(&item(10, "a")));
     assert_eq!(index_metadata(&backup_db), indexes);
+    assert!(
+        backup_db
+            .indexes()
+            .unwrap()
+            .iter()
+            .all(|index| index.root_page_id.is_some())
+    );
     let (indexed, scan) = indexed_and_scan_queries();
     assert!(matches!(
         backup_db.explain(&indexed).unwrap(),

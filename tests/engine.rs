@@ -952,6 +952,7 @@ fn compacted_copy_preserves_the_source_format_from_v1_through_v4() {
             database.create_index("users", "credits").unwrap();
         }
         let source_bytes = fs::read(&source.path).unwrap();
+        let source_indexes = database.indexes().unwrap();
 
         database.write_compacted_copy(&target.path).unwrap();
 
@@ -959,6 +960,11 @@ fn compacted_copy_preserves_the_source_format_from_v1_through_v4() {
             fs::read(&source.path).unwrap(),
             source_bytes,
             "V{source_format} source was modified"
+        );
+        assert_eq!(
+            database.indexes().unwrap(),
+            source_indexes,
+            "V{source_format} source indexes were modified"
         );
         database.close().unwrap();
 

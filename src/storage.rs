@@ -1837,6 +1837,9 @@ impl Database {
     /// database unchanged.
     pub fn write_compacted_copy(&self, target: impl AsRef<Path>) -> Result<()> {
         self.check_usable()?;
+        if self.format_version == PERSISTENT_INDEX_FORMAT_VERSION {
+            return self.write_v4_compacted_copy(target);
+        }
         if self.format_version >= MVCC_FORMAT_VERSION {
             if self.mvcc.has_active_snapshots()? {
                 return Err(Error::ActiveSnapshots);
