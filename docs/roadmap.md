@@ -84,6 +84,10 @@ distributed-system guarantees.
 - [x] Add bounded workload profiles, evidence-bearing candidates, and
   read-only qualitative simulations. They never apply index, storage, or plan
   changes and are not a cost-based or autonomous optimizer.
+- [x] Add one explicit bounded preceding/current workload-window pair,
+  count-backed qualitative drift detection, and candidate/simulation
+  re-evaluation. Material drift can mark old evidence stale or invalidated;
+  it never applies an optimization or writes a storage plan.
 - [x] Add a native, one-writer atomic compare-and-set extension that evaluates
   against the staged view and persists through the established transaction
   batch; this is not a multi-writer conflict protocol.

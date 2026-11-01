@@ -162,6 +162,22 @@ candidate active. Its directional effects are intentionally qualitative rather
 than fabricated timing or disk estimates. This remains a native diagnostic
 extension, not a stable `PublicEngine` capability or an autonomous optimizer.
 
+`rotate_optimization_window` keeps one preceding bounded profile and clears the
+current diagnostic window for a new explicit observation period.
+`optimization_observation_windows` returns the preceding/current pair and
+`optimization_workload_drift` returns an optional count-backed qualitative
+comparison. It detects only at least ten percentage-point changes in observed
+full-scan, primary-ID-lookup, range-lookup, or write share. It has no wall
+clock, persistent time series, user-data retention, or automatic reaction.
+
+`optimization_candidate_lifecycle` and
+`optimization_simulation_reevaluations` expose whether preceding evidence is
+still represented, `Stale`, or `Invalidated`. Moderate/high drift makes former
+evidence stale and gives it low effective confidence; low drift can reduce high
+confidence to moderate. These APIs remain handle-local native diagnostics;
+they do not add a public-engine capability, change a transaction, apply an
+index, activate a storage plan, verify an optimization, or roll anything back.
+
 ## Native transaction extensions
 
 `Transaction::compare_and_set` and `Transaction::snapshot_version` are native

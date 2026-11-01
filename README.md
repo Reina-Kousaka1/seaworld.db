@@ -391,6 +391,7 @@ completed 105 tests with zero failures, including the generated tests and all
 - [Backup and restore](docs/backup.md)
 - [Storage format](docs/storage-format.md)
 - [V1 compatibility contract and release gate](docs/compatibility-contract.md)
+- [Proposed v1.1.0-beta.1 scope and release gate](docs/v1.1.0-beta.1-scope.md)
 - [Platform and durability qualification](docs/platform-support.md)
 - [Security model](docs/security-model.md)
 - [WiredTiger assessment](docs/wiredtiger-assessment.md)

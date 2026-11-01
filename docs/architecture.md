@@ -100,6 +100,34 @@ disk, or throughput predictions. Candidates are less confident when a bounded
 candidate map has dropped observations. Hot-document and CAS-contention
 candidates remain warnings: SeaWorld has no approved automatic action for them.
 
+### Workload windows, drift, and recommendation lifecycle
+
+`rotate_optimization_window` explicitly retains one bounded preceding window
+and starts a fresh current one. `optimization_observation_windows` exposes the
+two profiles, while `optimization_workload_drift` compares their aggregate
+operation shares. No clock, time series, query values, document contents, or
+additional persistent state is involved. A restart clears both windows.
+
+The deterministic comparison reports only changes of at least ten percentage
+points in full-scan, primary-ID-lookup, range-lookup, or write share. The
+largest observed change classifies drift as `Low` (10--24 points), `Moderate`
+(25--49), or `High` (50 or more). Its confidence is `Low` below eight observed
+operations in either window, `Moderate` below 32, and `High` otherwise. The
+returned evidence contains the observed matching and total-operation counts so
+an operator can reproduce each classification without treating it as a
+latency prediction.
+
+`optimization_candidate_lifecycle` and
+`optimization_simulation_reevaluations` compare preceding candidate/simulation
+evidence against the current window. Material (`Moderate` or `High`) drift
+marks an otherwise still-represented former candidate or simulation `Stale` and
+reduces its effective confidence to `Low`; if it no longer has qualifying
+current evidence it is `Invalidated`. Low drift caps a formerly `High`
+confidence at `Moderate`. With no material drift, a current candidate remains
+`Recommended` and a current simulation remains `Simulated`; insufficient new
+evidence is represented as `Observed`. These states are diagnostic labels, not
+storage-plan states, and do not apply, verify, or roll back any optimization.
+
 This component is not telemetry: it has no network path, is disabled by
 default, is never written to a SeaWorld file, and is cleared on reopen. It is
 outside the transport-neutral `PublicEngine` contract. It does not create
@@ -112,7 +140,7 @@ automatic physical representations remain future architecture work. In
 particular, the diagnostics do not create multi-writer conflict detection or
 retry semantics; the current transaction core remains one writer at a time.
 There is no persistent storage-plan format, plan activation, plan rollback,
-workload-drift detector, or autonomous query optimizer in this phase.
+autonomous query optimizer in this phase.
 
 ## Integrity and trust boundaries
 
