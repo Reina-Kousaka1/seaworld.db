@@ -187,9 +187,7 @@ impl OptimizationObserver {
                     metrics.compare_and_set_failures.saturating_add(1);
             }
         }
-        if !condition_matched
-            && let Some(observation) = self.document_observation(collection, id)
-        {
+        if !condition_matched && let Some(observation) = self.document_observation(collection, id) {
             observation.compare_and_set_failures =
                 observation.compare_and_set_failures.saturating_add(1);
         }
