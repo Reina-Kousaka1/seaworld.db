@@ -22,9 +22,12 @@ mod update;
 pub use advisor::{
     CAS_CONTENTION_THRESHOLD, CollectionObservation, HOT_DOCUMENT_WRITE_THRESHOLD,
     INDEX_RECOMMENDATION_SCAN_THRESHOLD, OptimizationCandidate, OptimizationCandidateKind,
-    OptimizationEffect, OptimizationEvidence, OptimizationLevel, OptimizationMetrics,
-    OptimizationRationale, OptimizationRecommendation, OptimizationSimulation, OptimizationTarget,
-    OptimizationWorkloadProfile,
+    OptimizationCandidateLifecycle, OptimizationCandidateLifecycleState, OptimizationEffect,
+    OptimizationEvidence, OptimizationLevel, OptimizationMetrics, OptimizationObservationWindows,
+    OptimizationRationale, OptimizationRecommendation, OptimizationSimulation,
+    OptimizationSimulationReevaluation, OptimizationTarget, OptimizationWorkloadDrift,
+    OptimizationWorkloadProfile, WorkloadDriftDimension, WorkloadDriftDirection,
+    WorkloadDriftEvidence,
 };
 pub use api::{
     API_VERSION, ApiInfo, Capabilities, EngineHealth, OperationContext, PublicEngine,

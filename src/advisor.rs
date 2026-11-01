@@ -79,7 +79,7 @@ pub struct OptimizationWorkloadProfile {
 }
 
 /// The kind of read-only optimization candidate derived from observations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
 pub enum OptimizationCandidateKind {
     SecondaryAccessPath,
@@ -88,7 +88,7 @@ pub enum OptimizationCandidateKind {
 }
 
 /// The logical target named by a candidate without exposing storage handles.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
 pub enum OptimizationTarget {
     CollectionPath { collection: String, path: FieldPath },
@@ -96,7 +96,7 @@ pub enum OptimizationTarget {
 }
 
 /// Structured explanation for why a candidate exists.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
 pub enum OptimizationRationale {
     RepeatedFullScanPath,
@@ -152,6 +152,103 @@ pub struct OptimizationSimulation {
     pub storage_footprint: OptimizationEffect,
 }
 
+/// The preceding and current bounded observation windows held by one handle.
+///
+/// Rotating a window retains only one preceding profile. Neither window is
+/// persisted, and both are discarded when the database handle closes.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct OptimizationObservationWindows {
+    pub previous: Option<OptimizationWorkloadProfile>,
+    pub current: OptimizationWorkloadProfile,
+}
+
+/// A workload dimension whose observed share changed between two windows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum WorkloadDriftDimension {
+    FullScanShare,
+    PrimaryKeyLookupShare,
+    RangeLookupShare,
+    WriteShare,
+}
+
+/// The direction of one explainable workload-share change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum WorkloadDriftDirection {
+    Increased,
+    Decreased,
+}
+
+/// Count-based evidence for one workload-share change.
+///
+/// Consumers can calculate a ratio if they need one. SeaWorld deliberately
+/// reports the observed numerators and denominators instead of a fabricated
+/// performance estimate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct WorkloadDriftEvidence {
+    pub dimension: WorkloadDriftDimension,
+    pub direction: WorkloadDriftDirection,
+    pub previous_matching_operations: u64,
+    pub previous_total_operations: u64,
+    pub current_matching_operations: u64,
+    pub current_total_operations: u64,
+}
+
+/// A deterministic, qualitative comparison of the previous and current
+/// bounded workload windows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct OptimizationWorkloadDrift {
+    pub severity: OptimizationLevel,
+    pub confidence: OptimizationLevel,
+    pub evidence: Vec<WorkloadDriftEvidence>,
+}
+
+/// The diagnostic lifecycle state of a recommendation or simulation.
+///
+/// These states never cause an optimization to be applied. `Observed` means
+/// a former recommendation lacks enough current-window evidence to be
+/// reclassified. `Recommended` and `Simulated` describe current diagnostics;
+/// `Stale` and `Invalidated` describe old evidence after material drift.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OptimizationCandidateLifecycleState {
+    Observed,
+    Recommended,
+    Simulated,
+    Stale,
+    Invalidated,
+}
+
+/// A candidate evaluated against the current window after a rotation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct OptimizationCandidateLifecycle {
+    pub candidate: OptimizationCandidate,
+    pub current_candidate: Option<OptimizationCandidate>,
+    pub state: OptimizationCandidateLifecycleState,
+    pub baseline_confidence: Option<OptimizationLevel>,
+    pub effective_confidence: OptimizationLevel,
+    pub drift: Option<OptimizationWorkloadDrift>,
+}
+
+/// Re-evaluation of a simulation captured from the preceding window.
+///
+/// A `Stale` or `Invalidated` result means its former directional estimate
+/// must not be presented as a current-workload estimate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct OptimizationSimulationReevaluation {
+    pub previous: OptimizationSimulation,
+    pub current: Option<OptimizationSimulation>,
+    pub state: OptimizationCandidateLifecycleState,
+    pub effective_confidence: OptimizationLevel,
+    pub drift: Option<OptimizationWorkloadDrift>,
+}
+
 /// An explainable observation-derived suggestion. The advisor never applies it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -184,6 +281,21 @@ pub(crate) struct OptimizationObserver {
     metrics: OptimizationMetrics,
     full_scan_paths: BTreeMap<(String, FieldPath), u64>,
     documents: BTreeMap<(String, DocumentId), DocumentObservation>,
+    previous_window: Option<ObservationWindow>,
+}
+
+#[derive(Clone)]
+struct ObservationWindow {
+    profile: OptimizationWorkloadProfile,
+    candidates: Vec<OptimizationCandidate>,
+    simulations: Vec<OptimizationSimulation>,
+}
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct CandidateIdentity {
+    kind: OptimizationCandidateKind,
+    target: OptimizationTarget,
+    rationale: OptimizationRationale,
 }
 
 impl OptimizationObserver {
@@ -210,6 +322,47 @@ impl OptimizationObserver {
             dropped_scan_path_candidates: self.metrics.dropped_scan_path_candidates,
             dropped_document_candidates: self.metrics.dropped_document_candidates,
         }
+    }
+
+    pub(crate) fn workload_windows(&self) -> OptimizationObservationWindows {
+        OptimizationObservationWindows {
+            previous: self
+                .previous_window
+                .as_ref()
+                .map(|window| window.profile.clone()),
+            current: self.workload_profile(),
+        }
+    }
+
+    /// Finishes the current diagnostic window and starts a fresh one.
+    ///
+    /// This affects only opt-in, handle-local diagnostic memory. It never
+    /// changes the observed database, its query plans, or transaction state.
+    pub(crate) fn rotate_workload_window(&mut self) -> OptimizationObservationWindows {
+        if !self.enabled() {
+            return self.workload_windows();
+        }
+
+        let profile = self.workload_profile();
+        let candidates = self.candidates();
+        let simulations = self.simulations();
+        self.previous_window = Some(ObservationWindow {
+            profile,
+            candidates,
+            simulations,
+        });
+        self.metrics = OptimizationMetrics {
+            enabled: true,
+            ..OptimizationMetrics::default()
+        };
+        self.full_scan_paths.clear();
+        self.documents.clear();
+        self.workload_windows()
+    }
+
+    pub(crate) fn workload_drift(&self) -> Option<OptimizationWorkloadDrift> {
+        let previous = self.previous_window.as_ref()?;
+        workload_drift(&previous.profile, &self.workload_profile())
     }
 
     pub(crate) fn record_query(&mut self, query: &Query, plan: &QueryPlan) {
@@ -468,6 +621,112 @@ impl OptimizationObserver {
             .collect()
     }
 
+    pub(crate) fn candidate_lifecycle(&self) -> Vec<OptimizationCandidateLifecycle> {
+        let current: BTreeMap<_, _> = self
+            .candidates()
+            .into_iter()
+            .map(|candidate| (candidate_identity(&candidate), candidate))
+            .collect();
+        let Some(previous) = self.previous_window.as_ref() else {
+            return current
+                .into_values()
+                .map(|candidate| OptimizationCandidateLifecycle {
+                    effective_confidence: candidate.confidence,
+                    candidate,
+                    current_candidate: None,
+                    state: OptimizationCandidateLifecycleState::Recommended,
+                    baseline_confidence: None,
+                    drift: None,
+                })
+                .collect();
+        };
+
+        let drift = self.workload_drift();
+        let material_drift = is_material_drift(drift.as_ref());
+        let mild_drift = is_mild_drift(drift.as_ref());
+        let mut remaining = current;
+        let mut lifecycle = Vec::new();
+
+        for previous_candidate in &previous.candidates {
+            let current_candidate = remaining.remove(&candidate_identity(previous_candidate));
+            let candidate = current_candidate
+                .clone()
+                .unwrap_or_else(|| previous_candidate.clone());
+            let state = match (&current_candidate, material_drift) {
+                (Some(_), true) => OptimizationCandidateLifecycleState::Stale,
+                (None, true) => OptimizationCandidateLifecycleState::Invalidated,
+                (Some(_), false) => OptimizationCandidateLifecycleState::Recommended,
+                (None, false) => OptimizationCandidateLifecycleState::Observed,
+            };
+            let effective_confidence = lifecycle_confidence(
+                candidate.confidence,
+                material_drift,
+                mild_drift,
+            );
+            lifecycle.push(OptimizationCandidateLifecycle {
+                candidate,
+                current_candidate,
+                state,
+                baseline_confidence: Some(previous_candidate.confidence),
+                effective_confidence,
+                drift: drift.clone(),
+            });
+        }
+        lifecycle.extend(
+            remaining
+                .into_values()
+                .map(|candidate| OptimizationCandidateLifecycle {
+                    effective_confidence: candidate.confidence,
+                    candidate,
+                    current_candidate: None,
+                    state: OptimizationCandidateLifecycleState::Recommended,
+                    baseline_confidence: None,
+                    drift: drift.clone(),
+                }),
+        );
+        lifecycle
+    }
+
+    pub(crate) fn simulation_reevaluations(&self) -> Vec<OptimizationSimulationReevaluation> {
+        let Some(previous) = self.previous_window.as_ref() else {
+            return Vec::new();
+        };
+        let current: BTreeMap<_, _> = self
+            .simulations()
+            .into_iter()
+            .map(|simulation| (candidate_identity(&simulation.candidate), simulation))
+            .collect();
+        let drift = self.workload_drift();
+        let material_drift = is_material_drift(drift.as_ref());
+        let mild_drift = is_mild_drift(drift.as_ref());
+        previous
+            .simulations
+            .iter()
+            .map(|previous_simulation| {
+                let current_simulation = current
+                    .get(&candidate_identity(&previous_simulation.candidate))
+                    .cloned();
+                let state = match (&current_simulation, material_drift) {
+                    (Some(_), true) => OptimizationCandidateLifecycleState::Stale,
+                    (None, true) => OptimizationCandidateLifecycleState::Invalidated,
+                    (Some(_), false) => OptimizationCandidateLifecycleState::Simulated,
+                    (None, false) => OptimizationCandidateLifecycleState::Observed,
+                };
+                OptimizationSimulationReevaluation {
+                    effective_confidence: lifecycle_confidence(
+                        previous_simulation.candidate.confidence,
+                        material_drift,
+                        mild_drift,
+                    ),
+                    previous: previous_simulation.clone(),
+                    current: current_simulation,
+                    state,
+                    drift: drift.clone(),
+                }
+            })
+            .collect()
+    }
+
     fn document_observation(
         &mut self,
         collection: String,
@@ -532,6 +791,190 @@ fn confidence(observations: u64, complete: bool) -> OptimizationLevel {
     }
 }
 
+fn candidate_identity(candidate: &OptimizationCandidate) -> CandidateIdentity {
+    CandidateIdentity {
+        kind: candidate.kind,
+        target: candidate.target.clone(),
+        rationale: candidate.rationale,
+    }
+}
+
+fn is_material_drift(drift: Option<&OptimizationWorkloadDrift>) -> bool {
+    matches!(
+        drift.map(|drift| drift.severity),
+        Some(OptimizationLevel::Moderate | OptimizationLevel::High)
+    )
+}
+
+fn is_mild_drift(drift: Option<&OptimizationWorkloadDrift>) -> bool {
+    matches!(drift.map(|drift| drift.severity), Some(OptimizationLevel::Low))
+}
+
+fn lifecycle_confidence(
+    confidence: OptimizationLevel,
+    material_drift: bool,
+    mild_drift: bool,
+) -> OptimizationLevel {
+    if material_drift {
+        OptimizationLevel::Low
+    } else if mild_drift && confidence == OptimizationLevel::High {
+        OptimizationLevel::Moderate
+    } else {
+        confidence
+    }
+}
+
+#[derive(Default)]
+struct WorkloadMix {
+    reads: u64,
+    writes: u64,
+    full_scans: u64,
+    primary_key_lookups: u64,
+    range_lookups: u64,
+}
+
+struct WorkloadShare {
+    matching: u64,
+    total: u64,
+}
+
+fn workload_drift(
+    previous: &OptimizationWorkloadProfile,
+    current: &OptimizationWorkloadProfile,
+) -> Option<OptimizationWorkloadDrift> {
+    let previous = workload_mix(previous);
+    let current = workload_mix(current);
+    let mut evidence = Vec::new();
+    let mut largest_change = 0;
+
+    compare_share(
+        &mut evidence,
+        &mut largest_change,
+        WorkloadDriftDimension::FullScanShare,
+        WorkloadShare {
+            matching: previous.full_scans,
+            total: previous.reads,
+        },
+        WorkloadShare {
+            matching: current.full_scans,
+            total: current.reads,
+        },
+    );
+    compare_share(
+        &mut evidence,
+        &mut largest_change,
+        WorkloadDriftDimension::PrimaryKeyLookupShare,
+        WorkloadShare {
+            matching: previous.primary_key_lookups,
+            total: previous.reads,
+        },
+        WorkloadShare {
+            matching: current.primary_key_lookups,
+            total: current.reads,
+        },
+    );
+    compare_share(
+        &mut evidence,
+        &mut largest_change,
+        WorkloadDriftDimension::RangeLookupShare,
+        WorkloadShare {
+            matching: previous.range_lookups,
+            total: previous.reads,
+        },
+        WorkloadShare {
+            matching: current.range_lookups,
+            total: current.reads,
+        },
+    );
+    compare_share(
+        &mut evidence,
+        &mut largest_change,
+        WorkloadDriftDimension::WriteShare,
+        WorkloadShare {
+            matching: previous.writes,
+            total: previous.reads.saturating_add(previous.writes),
+        },
+        WorkloadShare {
+            matching: current.writes,
+            total: current.reads.saturating_add(current.writes),
+        },
+    );
+
+    if evidence.is_empty() {
+        return None;
+    }
+    let observations = previous
+        .reads
+        .saturating_add(previous.writes)
+        .min(current.reads.saturating_add(current.writes));
+    Some(OptimizationWorkloadDrift {
+        severity: if largest_change >= 50 {
+            OptimizationLevel::High
+        } else if largest_change >= 25 {
+            OptimizationLevel::Moderate
+        } else {
+            OptimizationLevel::Low
+        },
+        confidence: if observations < INDEX_RECOMMENDATION_SCAN_THRESHOLD {
+            OptimizationLevel::Low
+        } else if observations < INDEX_RECOMMENDATION_SCAN_THRESHOLD.saturating_mul(4) {
+            OptimizationLevel::Moderate
+        } else {
+            OptimizationLevel::High
+        },
+        evidence,
+    })
+}
+
+fn workload_mix(profile: &OptimizationWorkloadProfile) -> WorkloadMix {
+    profile
+        .collections
+        .values()
+        .fold(WorkloadMix::default(), |mut mix, metrics| {
+            mix.reads = mix.reads.saturating_add(metrics.reads);
+            mix.writes = mix.writes.saturating_add(metrics.writes);
+            mix.full_scans = mix.full_scans.saturating_add(metrics.full_scans);
+            mix.primary_key_lookups = mix
+                .primary_key_lookups
+                .saturating_add(metrics.primary_key_lookups);
+            mix.range_lookups = mix
+                .range_lookups
+                .saturating_add(metrics.secondary_index_range_scans);
+            mix
+        })
+}
+
+fn compare_share(
+    evidence: &mut Vec<WorkloadDriftEvidence>,
+    largest_change: &mut u64,
+    dimension: WorkloadDriftDimension,
+    previous: WorkloadShare,
+    current: WorkloadShare,
+) {
+    if previous.total == 0 || current.total == 0 {
+        return;
+    }
+    let previous_share = previous.matching.saturating_mul(100) / previous.total;
+    let current_share = current.matching.saturating_mul(100) / current.total;
+    let change = previous_share.abs_diff(current_share);
+    if change < 10 {
+        return;
+    }
+    *largest_change = (*largest_change).max(change);
+    evidence.push(WorkloadDriftEvidence {
+        dimension,
+        direction: if current_share > previous_share {
+            WorkloadDriftDirection::Increased
+        } else {
+            WorkloadDriftDirection::Decreased
+        },
+        previous_matching_operations: previous.matching,
+        previous_total_operations: previous.total,
+        current_matching_operations: current.matching,
+        current_total_operations: current.total,
+    });
+}
+
 fn comparison_paths(filter: &Filter) -> Vec<FieldPath> {
     let mut paths = Vec::new();
     collect_comparison_paths(filter, &mut paths);
@@ -558,6 +1001,29 @@ mod tests {
     use crate::{CompareOp, Filter, Query, QueryPlan, Value};
 
     use super::*;
+
+    fn full_scan_query() -> (Query, QueryPlan) {
+        (
+            Query::new(
+                "events",
+                Filter::Compare {
+                    path: FieldPath::parse("account").unwrap(),
+                    op: CompareOp::Eq,
+                    value: Value::Integer(7),
+                },
+            ),
+            QueryPlan::FullScan {
+                collection: "events".into(),
+            },
+        )
+    }
+
+    fn record_full_scans(observer: &mut OptimizationObserver, count: u64) {
+        let (query, plan) = full_scan_query();
+        for _ in 0..count {
+            observer.record_query(&query, &plan);
+        }
+    }
 
     #[test]
     fn observation_is_opt_in_and_never_recommends_array_indexes() {
@@ -761,5 +1227,176 @@ mod tests {
         assert_eq!(profile.observed_documents, MAX_OBSERVED_DOCUMENTS);
         assert_eq!(profile.document_capacity, MAX_OBSERVED_DOCUMENTS);
         assert!(profile.dropped_document_candidates > 0);
+    }
+
+    #[test]
+    fn similar_windows_do_not_report_drift() {
+        let mut observer = OptimizationObserver::default();
+        observer.set_enabled(true);
+        for _ in 0..32 {
+            observer.record_primary_read("events");
+        }
+        let windows = observer.rotate_workload_window();
+        assert_eq!(windows.previous.unwrap().collections["events"].reads, 32);
+        assert!(windows.current.collections.is_empty());
+
+        for _ in 0..32 {
+            observer.record_primary_read("events");
+        }
+        assert!(observer.workload_drift().is_none());
+    }
+
+    #[test]
+    fn drift_is_explainable_at_low_moderate_and_high_severity() {
+        let scenarios = [
+            (4_u64, OptimizationLevel::Low),
+            (8_u64, OptimizationLevel::Moderate),
+            (16_u64, OptimizationLevel::High),
+        ];
+        for (full_scans, expected_severity) in scenarios {
+            let mut observer = OptimizationObserver::default();
+            observer.set_enabled(true);
+            for _ in 0..32 {
+                observer.record_primary_read("events");
+            }
+            observer.rotate_workload_window();
+            record_full_scans(&mut observer, full_scans);
+            for _ in 0..32 - full_scans {
+                observer.record_primary_read("events");
+            }
+
+            let drift = observer.workload_drift().unwrap();
+            assert_eq!(drift.severity, expected_severity);
+            assert_eq!(drift.confidence, OptimizationLevel::High);
+            assert!(drift.evidence.iter().any(|evidence| {
+                evidence.dimension == WorkloadDriftDimension::FullScanShare
+                    && evidence.direction == WorkloadDriftDirection::Increased
+            }));
+        }
+    }
+
+    #[test]
+    fn small_windows_report_low_drift_confidence() {
+        let mut observer = OptimizationObserver::default();
+        observer.set_enabled(true);
+        for _ in 0..4 {
+            observer.record_primary_read("events");
+        }
+        observer.rotate_workload_window();
+        record_full_scans(&mut observer, 4);
+
+        let drift = observer.workload_drift().unwrap();
+        assert_eq!(drift.severity, OptimizationLevel::High);
+        assert_eq!(drift.confidence, OptimizationLevel::Low);
+    }
+
+    #[test]
+    fn stable_candidate_evidence_remains_recommended_and_simulated() {
+        let mut observer = OptimizationObserver::default();
+        observer.set_enabled(true);
+        record_full_scans(&mut observer, INDEX_RECOMMENDATION_SCAN_THRESHOLD);
+        observer.rotate_workload_window();
+        record_full_scans(&mut observer, INDEX_RECOMMENDATION_SCAN_THRESHOLD);
+
+        assert!(observer.workload_drift().is_none());
+        assert_eq!(
+            observer.candidate_lifecycle()[0].state,
+            OptimizationCandidateLifecycleState::Recommended
+        );
+        assert_eq!(
+            observer.simulation_reevaluations()[0].state,
+            OptimizationCandidateLifecycleState::Simulated
+        );
+    }
+
+    #[test]
+    fn low_drift_only_decays_high_confidence_to_moderate() {
+        assert_eq!(
+            lifecycle_confidence(OptimizationLevel::High, false, true),
+            OptimizationLevel::Moderate
+        );
+    }
+
+    #[test]
+    fn rotation_keeps_only_one_bounded_previous_window() {
+        let mut observer = OptimizationObserver::default();
+        observer.set_enabled(true);
+        let (query, plan) = full_scan_query();
+        for value in 0..=MAX_OBSERVED_SCAN_PATHS {
+            let query = Query::new(
+                "events",
+                Filter::Compare {
+                    path: FieldPath::parse(&format!("field_{value}")).unwrap(),
+                    op: CompareOp::Eq,
+                    value: Value::Integer(value as i64),
+                },
+            );
+            observer.record_query(&query, &plan);
+        }
+        let windows = observer.rotate_workload_window();
+        let previous = windows.previous.unwrap();
+        assert_eq!(previous.observed_scan_paths, MAX_OBSERVED_SCAN_PATHS);
+        assert!(previous.dropped_scan_path_candidates > 0);
+        assert!(windows.current.collections.is_empty());
+
+        observer.record_query(&query, &plan);
+        let windows = observer.rotate_workload_window();
+        assert_eq!(windows.previous.unwrap().observed_scan_paths, 1);
+        assert!(windows.current.collections.is_empty());
+    }
+
+    #[test]
+    fn material_drift_marks_candidates_and_simulations_stale() {
+        let mut observer = OptimizationObserver::default();
+        observer.set_enabled(true);
+        record_full_scans(&mut observer, INDEX_RECOMMENDATION_SCAN_THRESHOLD);
+        observer.rotate_workload_window();
+
+        record_full_scans(&mut observer, INDEX_RECOMMENDATION_SCAN_THRESHOLD);
+        for _ in 0..24 {
+            observer.record_primary_read("events");
+        }
+
+        let lifecycle = observer.candidate_lifecycle();
+        assert_eq!(lifecycle.len(), 1);
+        assert_eq!(
+            lifecycle[0].state,
+            OptimizationCandidateLifecycleState::Stale
+        );
+        assert_eq!(lifecycle[0].effective_confidence, OptimizationLevel::Low);
+        assert!(lifecycle[0].current_candidate.is_some());
+
+        let simulations = observer.simulation_reevaluations();
+        assert_eq!(simulations.len(), 1);
+        assert_eq!(
+            simulations[0].state,
+            OptimizationCandidateLifecycleState::Stale
+        );
+        assert!(simulations[0].current.is_some());
+    }
+
+    #[test]
+    fn material_drift_invalidates_unrepresented_prior_candidate() {
+        let mut observer = OptimizationObserver::default();
+        observer.set_enabled(true);
+        record_full_scans(&mut observer, INDEX_RECOMMENDATION_SCAN_THRESHOLD);
+        observer.rotate_workload_window();
+        for _ in 0..32 {
+            observer.record_primary_read("events");
+        }
+
+        let lifecycle = observer.candidate_lifecycle();
+        assert_eq!(lifecycle.len(), 1);
+        assert_eq!(
+            lifecycle[0].state,
+            OptimizationCandidateLifecycleState::Invalidated
+        );
+        assert_eq!(lifecycle[0].effective_confidence, OptimizationLevel::Low);
+        let simulations = observer.simulation_reevaluations();
+        assert_eq!(simulations.len(), 1);
+        assert_eq!(
+            simulations[0].state,
+            OptimizationCandidateLifecycleState::Invalidated
+        );
     }
 }

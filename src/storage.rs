@@ -350,6 +350,34 @@ impl Database {
         self.optimization_observer.borrow().workload_profile()
     }
 
+    /// Returns the preceding and current bounded diagnostic windows.
+    ///
+    /// Windows are handle-local, opt-in diagnostic state. They never retain a
+    /// historical time series or alter persistent database state.
+    pub fn optimization_observation_windows(&self) -> crate::OptimizationObservationWindows {
+        self.optimization_observer.borrow().workload_windows()
+    }
+
+    /// Retains the current bounded observation window as the preceding window
+    /// and starts a fresh current window.
+    ///
+    /// Rotation is explicit so normal reads and writes do not run drift
+    /// analysis. It only changes in-memory diagnostics and never changes a
+    /// query plan, index, transaction, storage layout, or database byte.
+    pub fn rotate_optimization_window(&mut self) -> crate::OptimizationObservationWindows {
+        self.optimization_observer
+            .borrow_mut()
+            .rotate_workload_window()
+    }
+
+    /// Compares the preceding and current bounded windows, if both exist.
+    ///
+    /// The result is a qualitative, count-backed drift explanation. It is not
+    /// a prediction, a cost-based plan, or an automatic optimization action.
+    pub fn optimization_workload_drift(&self) -> Option<crate::OptimizationWorkloadDrift> {
+        self.optimization_observer.borrow().workload_drift()
+    }
+
     /// Returns non-binding candidates with structured evidence and qualitative
     /// benefit, cost, and confidence estimates.
     ///
@@ -366,6 +394,26 @@ impl Database {
     /// they are not a timing, cost-based planner, or storage-plan activation.
     pub fn optimization_simulations(&self) -> Vec<crate::OptimizationSimulation> {
         self.optimization_observer.borrow().simulations()
+    }
+
+    /// Re-evaluates preceding-window candidates against the current window.
+    ///
+    /// Material drift marks former evidence as stale or invalidated instead of
+    /// silently presenting it as current. The lifecycle remains diagnostic
+    /// only and cannot apply a candidate.
+    pub fn optimization_candidate_lifecycle(&self) -> Vec<crate::OptimizationCandidateLifecycle> {
+        self.optimization_observer.borrow().candidate_lifecycle()
+    }
+
+    /// Re-evaluates preceding-window simulations against the current window.
+    ///
+    /// A stale result is not a new simulation or a storage change; callers can
+    /// request `optimization_simulations` for an independent current-window
+    /// qualitative estimate.
+    pub fn optimization_simulation_reevaluations(
+        &self,
+    ) -> Vec<crate::OptimizationSimulationReevaluation> {
+        self.optimization_observer.borrow().simulation_reevaluations()
     }
 
     /// Begins a stable V3 read snapshot that can outlive a mutable writer borrow.
@@ -4160,7 +4208,7 @@ mod tests {
         let path = observation_test_path();
         let mut database = Database::create(&path).unwrap();
         database.create_collection("events").unwrap();
-        database
+        let id = database
             .insert(
                 "events",
                 Document::empty().with("account", Value::Integer(7)),
@@ -4185,9 +4233,32 @@ mod tests {
 
         assert_eq!(candidates.len(), 1);
         assert_eq!(simulations.len(), 1);
+        let windows = database.rotate_optimization_window();
+        assert_eq!(windows.previous.unwrap().collections["events"].full_scans, 8);
+        for _ in 0..crate::advisor::INDEX_RECOMMENDATION_SCAN_THRESHOLD {
+            assert_eq!(database.execute(&query).unwrap().len(), 1);
+        }
+        for _ in 0..24 {
+            assert!(database.get("events", id).unwrap().is_some());
+        }
+        assert!(matches!(
+            database.optimization_workload_drift().unwrap().severity,
+            crate::OptimizationLevel::High
+        ));
+        assert!(matches!(
+            database.optimization_candidate_lifecycle()[0].state,
+            crate::OptimizationCandidateLifecycleState::Stale
+        ));
+        assert!(matches!(
+            database.optimization_simulation_reevaluations()[0].state,
+            crate::OptimizationCandidateLifecycleState::Stale
+        ));
         assert!(database.indexes().unwrap().is_empty());
         assert_eq!(fs::read(&path).unwrap(), before);
         database.close().unwrap();
+        let reopened = Database::open_reader(&path).unwrap();
+        assert_eq!(reopened.execute(&query).unwrap().len(), 1);
+        drop(reopened);
         let _ = fs::remove_file(&path);
         let _ = fs::remove_file(sidecar_path(&path, ".writer.lock").unwrap());
     }
