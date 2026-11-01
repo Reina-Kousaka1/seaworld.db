@@ -8,7 +8,7 @@ The first release is embedded-first: an application opens a local `*.seaworld.db
 
 ## Language decision: Rust stable
 
-The engine core is implemented in stable Rust. `Cargo.toml` declares Rust 1.89 as its minimum version. Rust is the engine implementation language; future drivers can target Java, Python, JavaScript/TypeScript, Tyvera, and other hosts without changing that boundary.
+The engine core is implemented in stable Rust. `Cargo.toml` declares Rust 1.89 as its minimum version, and CI compiles all targets with that version. Rust is the engine implementation language; future drivers can target Java, Python, JavaScript/TypeScript, Tyvera, and other hosts without changing that boundary.
 
 V1 remains byte-for-byte supported. New databases use the explicitly versioned V4 header and transaction grammar; V2/V3 remain readable and can be created explicitly for compatibility tooling. V4 adds persistent index pages without changing the V1-V3 record grammar. V1 handles keep single-operation CRUD and can be copied to a later format through a non-overwriting compacted-copy path before using transactions or indexes.
 

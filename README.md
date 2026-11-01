@@ -370,7 +370,9 @@ engine and V1–V4 readers remain authoritative.
 
 ## Development and V1 quality gate
 
-SeaWorld targets stable Rust 1.89 or later. Run the same local checks as CI:
+SeaWorld targets stable Rust 1.89 or later. CI compiles all targets with the
+declared MSRV (Rust 1.89); the Linux and Windows jobs run the complete stable
+toolchain qualification. Run the same full local checks as CI:
 
 ```sh
 cargo fmt --all -- --check

@@ -19,6 +19,14 @@ Linux ARM64, Raspberry Pi, macOS, network filesystems, removable storage, and
 container volume drivers are not V1-qualified merely because Rust can target
 them. They need a separate build, crash, locking, and filesystem assessment.
 
+## Rust toolchain baseline
+
+`Cargo.toml` declares Rust 1.89 as SeaWorld's minimum supported Rust version.
+CI has a separate Ubuntu check that compiles all targets, including the
+crash-test target, with Rust 1.89. The full format, lint, test, crash, and
+release-build qualification continues to run on the stable toolchain matrix
+above.
+
 ## File-system contract
 
 SeaWorld relies on its cooperating file locks to exclude a second writer and to

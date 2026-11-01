@@ -1,6 +1,15 @@
 # Security policy
 
-SeaWorld DB is experimental software and is not suitable for production use. Only the current `main` branch and the current `0.0.x` development line are supported; there are no stable release branches or guaranteed patch windows.
+SeaWorld DB `v1.0.0` is the project's current stable release line. The
+`v1.1.0-beta.1` line is a pre-release and may change before a later stable
+release. `main` is the primary security-fix target; reports affecting released
+V1 artifacts are also welcome. There are no guaranteed patch windows or
+response-time commitments.
+
+Stable release status describes the documented public API and compatibility
+contract. It does not expand SeaWorld's published durability, platform, or
+production-readiness boundaries. Review the documented limitations before using
+SeaWorld with production data.
 
 Report vulnerabilities through GitHub Private Vulnerability Reporting for this repository, using the private report flow from the Security tab. Do not post exploit details, malicious database files, secrets, or personal data in public issues. If the private report option is not visible, ask a repository maintainer to enable it before sending sensitive details. This repository does not publish a private email address or response-time commitment.
 
@@ -12,6 +21,6 @@ A useful report includes:
 - expected versus observed behavior and any impact on confidentiality, integrity, or availability;
 - sanitized logs only, with user data and credentials removed.
 
-The maintainer should acknowledge reports, coordinate a fix and disclosure with the reporter, and publish an advisory after affected users have a reasonable opportunity to update. No response SLA is promised for this experimental project.
+The maintainer should acknowledge reports, coordinate a fix and disclosure with the reporter, and publish an advisory after affected users have a reasonable opportunity to update. No response SLA is promised.
 
 Current controls and known limitations are described in [the security model](docs/security-model.md). CRC32C checksums are not authentication. Networking, authentication, authorization, TLS, rate limiting, production-grade resource governance, and a dedicated fuzzing campaign are not implemented. No custom cryptography is planned.

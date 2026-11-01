@@ -9,6 +9,15 @@ permissions:
   contents: read
 
 jobs:
+  msrv:
+    name: MSRV 1.89
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.89
+      - name: Check declared minimum Rust version
+        run: cargo check --all-targets --features crash-test --locked
+
   rust:
     name: Rust engine (${{ matrix.os }})
     strategy:
