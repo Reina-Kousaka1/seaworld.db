@@ -5,8 +5,8 @@
 //! The public API and the planned SQL adapter share one document-native engine. The
 //! V1/V2/V3 files remain readable; new databases use V4 persistent index pages.
 
-mod api;
 mod advisor;
+mod api;
 mod btree;
 mod codec;
 mod document;

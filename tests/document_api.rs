@@ -437,26 +437,30 @@ fn sequential_add_mutations_preserve_each_committed_delta() {
     let balance = FieldPath::parse("balance").unwrap();
 
     let mut first = db.begin_transaction().unwrap();
-    assert!(first
-        .update_fields(
-            "accounts",
-            id,
-            &[DocumentOperation::Increment(
-                balance.clone(),
-                Value::Integer(-200),
-            )],
-        )
-        .unwrap());
+    assert!(
+        first
+            .update_fields(
+                "accounts",
+                id,
+                &[DocumentOperation::Increment(
+                    balance.clone(),
+                    Value::Integer(-200),
+                )],
+            )
+            .unwrap()
+    );
     first.commit().unwrap();
 
     let mut second = db.begin_transaction().unwrap();
-    assert!(second
-        .update_fields(
-            "accounts",
-            id,
-            &[DocumentOperation::Increment(balance, Value::Integer(-300))],
-        )
-        .unwrap());
+    assert!(
+        second
+            .update_fields(
+                "accounts",
+                id,
+                &[DocumentOperation::Increment(balance, Value::Integer(-300))],
+            )
+            .unwrap()
+    );
     second.commit().unwrap();
 
     assert_eq!(

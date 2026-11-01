@@ -10,6 +10,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering as AtomicOrdering},
 };
 
+use crate::advisor::OptimizationObserver;
 use crate::{
     CollectionId, Document, DocumentId, Error, FieldPath, IndexId, Query, QueryPlan, QueryRow,
     Result, Value,
@@ -24,7 +25,6 @@ use crate::{
     mvcc::{CommitVersion, MvccStore, Snapshot},
     query::{self, CompareOp, Filter, MAX_QUERY_RESULTS, SortDirection},
 };
-use crate::advisor::OptimizationObserver;
 
 /// Maximum supported file size for current SeaWorld database formats.
 pub const MAX_DATABASE_BYTES: u64 = format::MAX_DATABASE_SIZE_BYTES;
@@ -1644,7 +1644,9 @@ impl Database {
             let name = self
                 .collection_names_by_id
                 .get(&entry.collection_id)
-                .ok_or_else(|| Error::Integrity("committed write names an unknown collection".into()))?
+                .ok_or_else(|| {
+                    Error::Integrity("committed write names an unknown collection".into())
+                })?
                 .clone();
             writes.push((name, DocumentId(*document_id)));
         }
@@ -3972,21 +3974,25 @@ mod tests {
         for _ in 0..crate::advisor::INDEX_RECOMMENDATION_SCAN_THRESHOLD {
             database.execute(&query).unwrap();
         }
-        assert!(database
-            .optimization_observer
-            .borrow()
-            .recommendations()
-            .is_empty());
+        assert!(
+            database
+                .optimization_observer
+                .borrow()
+                .recommendations()
+                .is_empty()
+        );
 
         database.set_optimization_observation(true);
         let mut rolled_back = database.begin_transaction().unwrap();
-        assert!(rolled_back
-            .update(
-                "events",
-                id,
-                Document::empty().with("account", Value::Integer(9)),
-            )
-            .unwrap());
+        assert!(
+            rolled_back
+                .update(
+                    "events",
+                    id,
+                    Document::empty().with("account", Value::Integer(9)),
+                )
+                .unwrap()
+        );
         rolled_back.rollback();
         for _ in 0..crate::advisor::INDEX_RECOMMENDATION_SCAN_THRESHOLD {
             database.execute(&query).unwrap();
@@ -4029,12 +4035,14 @@ mod tests {
         database.close().unwrap();
         let reopened = Database::open_reader(&path).unwrap();
         assert_eq!(reopened.execute(&query).unwrap().len(), 1);
-        assert!(reopened
-            .optimization_observer
-            .borrow()
-            .metrics()
-            .collections
-            .is_empty());
+        assert!(
+            reopened
+                .optimization_observer
+                .borrow()
+                .metrics()
+                .collections
+                .is_empty()
+        );
         drop(reopened);
         let _ = fs::remove_file(&path);
         let _ = fs::remove_file(sidecar_path(&path, ".writer.lock").unwrap());

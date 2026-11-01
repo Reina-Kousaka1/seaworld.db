@@ -73,7 +73,11 @@ impl OptimizationObserver {
             return;
         }
         let collection = query.collection().to_owned();
-        let metrics = self.metrics.collections.entry(collection.clone()).or_default();
+        let metrics = self
+            .metrics
+            .collections
+            .entry(collection.clone())
+            .or_default();
         metrics.reads = metrics.reads.saturating_add(1);
         match plan {
             QueryPlan::PrimaryKeyLookup { .. } => {
@@ -89,7 +93,10 @@ impl OptimizationObserver {
             QueryPlan::FullScan { .. } => {
                 metrics.full_scans = metrics.full_scans.saturating_add(1);
                 for path in comparison_paths(query.filter()) {
-                    let count = self.full_scan_paths.entry((collection.clone(), path)).or_default();
+                    let count = self
+                        .full_scan_paths
+                        .entry((collection.clone(), path))
+                        .or_default();
                     *count = count.saturating_add(1);
                 }
             }
@@ -113,7 +120,11 @@ impl OptimizationObserver {
         if !self.enabled() {
             return;
         }
-        let metrics = self.metrics.collections.entry(collection.clone()).or_default();
+        let metrics = self
+            .metrics
+            .collections
+            .entry(collection.clone())
+            .or_default();
         metrics.writes = metrics.writes.saturating_add(1);
         let count = self.document_writes.entry((collection, id)).or_default();
         *count = count.saturating_add(1);
