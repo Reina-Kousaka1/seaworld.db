@@ -658,11 +658,8 @@ impl OptimizationObserver {
                 (Some(_), false) => OptimizationCandidateLifecycleState::Recommended,
                 (None, false) => OptimizationCandidateLifecycleState::Observed,
             };
-            let effective_confidence = lifecycle_confidence(
-                candidate.confidence,
-                material_drift,
-                mild_drift,
-            );
+            let effective_confidence =
+                lifecycle_confidence(candidate.confidence, material_drift, mild_drift);
             lifecycle.push(OptimizationCandidateLifecycle {
                 candidate,
                 current_candidate,
@@ -807,7 +804,10 @@ fn is_material_drift(drift: Option<&OptimizationWorkloadDrift>) -> bool {
 }
 
 fn is_mild_drift(drift: Option<&OptimizationWorkloadDrift>) -> bool {
-    matches!(drift.map(|drift| drift.severity), Some(OptimizationLevel::Low))
+    matches!(
+        drift.map(|drift| drift.severity),
+        Some(OptimizationLevel::Low)
+    )
 }
 
 fn lifecycle_confidence(
