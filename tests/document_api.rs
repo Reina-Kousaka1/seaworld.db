@@ -190,7 +190,7 @@ fn field_updates_are_atomic_and_indexed_across_reopen() {
 #[test]
 fn public_api_metadata_and_error_codes_are_transport_neutral() {
     assert_eq!(seaworld_db::API_VERSION, "1.0.0");
-    assert_eq!(env!("CARGO_PKG_VERSION"), "1.1.0-beta.1");
+    assert_eq!(env!("CARGO_PKG_VERSION"), "1.1.0-beta");
     assert!(seaworld_db::capabilities().projections);
     assert!(!seaworld_db::capabilities().durable_request_deduplication);
     let request_id = seaworld_db::RequestId::new("operation-17").unwrap();

@@ -31,10 +31,12 @@ initial package/API values happen to match; future format and API changes are
 versioned independently. The checked-in Java-generated V1 fixture remains part
 of the compatibility contract.
 
-The `v1.1.0-beta.1` pre-release advances the package version only. It retains
-Public API `1.0.0`, on-disk format V4, and V1--V4 read compatibility. Its
-implemented scope and limits are documented in the
-[beta release notes](docs/releases/v1.1.0-beta.1.md).
+**SeaWorld DB 1.1 Beta** (`v1.1.0-beta`) is the current pre-release. Its
+package version is `1.1.0-beta`; Public API remains `1.0.0`, and the on-disk
+format remains V4. It retains V1--V4 read compatibility, including the
+Java-generated V1 fixture. The earlier `v1.1.0-beta.1` remains a historical
+pre-release. See the [SeaWorld DB 1.1 Beta release notes](docs/releases/v1.1.0-beta.md)
+for the current scope and limits.
 
 ## What SeaWorld is
 
@@ -399,7 +401,8 @@ completed 105 tests with zero failures, including the generated tests and all
 - [Backup and restore](docs/backup.md)
 - [Storage format](docs/storage-format.md)
 - [V1 compatibility contract and release gate](docs/compatibility-contract.md)
-- [Proposed v1.1.0-beta.1 scope and release gate](docs/v1.1.0-beta.1-scope.md)
+- [SeaWorld DB 1.1 Beta release notes](docs/releases/v1.1.0-beta.md)
+- [Historical v1.1.0-beta.1 scope and release gate](docs/v1.1.0-beta.1-scope.md)
 - [Platform and durability qualification](docs/platform-support.md)
 - [Security model](docs/security-model.md)
 - [WiredTiger assessment](docs/wiredtiger-assessment.md)

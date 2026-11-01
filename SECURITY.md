@@ -1,7 +1,8 @@
 # Security policy
 
-SeaWorld DB `v1.0.0` is the project's current stable release line. The
-`v1.1.0-beta.1` line is a pre-release and may change before a later stable
+SeaWorld DB `v1.0.0` is the project's current stable release line. **SeaWorld
+DB 1.1 Beta** (`v1.1.0-beta`) is the current pre-release; the earlier
+`v1.1.0-beta.1` remains a historical release and is not changed by this
 release. `main` is the primary security-fix target; reports affecting released
 V1 artifacts are also welcome. There are no guaranteed patch windows or
 response-time commitments.
