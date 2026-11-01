@@ -413,7 +413,9 @@ impl Database {
     pub fn optimization_simulation_reevaluations(
         &self,
     ) -> Vec<crate::OptimizationSimulationReevaluation> {
-        self.optimization_observer.borrow().simulation_reevaluations()
+        self.optimization_observer
+            .borrow()
+            .simulation_reevaluations()
     }
 
     /// Begins a stable V3 read snapshot that can outlive a mutable writer borrow.
