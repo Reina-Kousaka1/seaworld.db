@@ -4234,7 +4234,10 @@ mod tests {
         assert_eq!(candidates.len(), 1);
         assert_eq!(simulations.len(), 1);
         let windows = database.rotate_optimization_window();
-        assert_eq!(windows.previous.unwrap().collections["events"].full_scans, 8);
+        assert_eq!(
+            windows.previous.unwrap().collections["events"].full_scans,
+            8
+        );
         for _ in 0..crate::advisor::INDEX_RECOMMENDATION_SCAN_THRESHOLD {
             assert_eq!(database.execute(&query).unwrap().len(), 1);
         }
