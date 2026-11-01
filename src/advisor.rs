@@ -91,14 +91,8 @@ pub enum OptimizationCandidateKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum OptimizationTarget {
-    CollectionPath {
-        collection: String,
-        path: FieldPath,
-    },
-    Document {
-        collection: String,
-        id: DocumentId,
-    },
+    CollectionPath { collection: String, path: FieldPath },
+    Document { collection: String, id: DocumentId },
 }
 
 /// Structured explanation for why a candidate exists.
@@ -620,7 +614,10 @@ mod tests {
         assert_eq!(profile.scan_path_capacity, MAX_OBSERVED_SCAN_PATHS);
         let candidates = observer.candidates();
         assert_eq!(candidates.len(), 1);
-        assert_eq!(candidates[0].kind, OptimizationCandidateKind::SecondaryAccessPath);
+        assert_eq!(
+            candidates[0].kind,
+            OptimizationCandidateKind::SecondaryAccessPath
+        );
         assert_eq!(
             candidates[0].target,
             OptimizationTarget::CollectionPath {
@@ -694,11 +691,13 @@ mod tests {
         let candidate = observer
             .candidates()
             .into_iter()
-            .find(|candidate| matches!(
-                &candidate.target,
-                OptimizationTarget::CollectionPath { collection, path }
-                    if collection == "events" && path == &target_path
-            ))
+            .find(|candidate| {
+                matches!(
+                    &candidate.target,
+                    OptimizationTarget::CollectionPath { collection, path }
+                        if collection == "events" && path == &target_path
+                )
+            })
             .unwrap();
         assert_eq!(candidate.confidence, OptimizationLevel::Low);
         assert!(observer.workload_profile().dropped_scan_path_candidates > 0);
