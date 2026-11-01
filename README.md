@@ -14,7 +14,7 @@ It is an independent database project. SeaWorld uses its own document,
 transaction, recovery, and on-disk storage layers; it does not wrap, proxy, or
 embed SQLite, PostgreSQL, MongoDB, H2, Derby, or WiredTiger.
 
-## Current release
+## Stable release and pre-release
 
 **SeaWorld DB v1.0.0** is the first stable package and public Rust API release.
 
@@ -30,6 +30,11 @@ Package, public API, and on-disk format are separate version spaces. Their
 initial package/API values happen to match; future format and API changes are
 versioned independently. The checked-in Java-generated V1 fixture remains part
 of the compatibility contract.
+
+The `v1.1.0-beta.1` pre-release advances the package version only. It retains
+Public API `1.0.0`, on-disk format V4, and V1--V4 read compatibility. Its
+implemented scope and limits are documented in the
+[beta release notes](docs/releases/v1.1.0-beta.1.md).
 
 ## What SeaWorld is
 
