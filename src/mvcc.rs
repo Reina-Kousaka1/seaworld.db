@@ -348,6 +348,67 @@ impl Snapshot {
         self.lease.version
     }
 
+    /// Lists collection names visible at this snapshot version, in ascending order.
+    pub fn collection_names(&self) -> Result<Vec<String>> {
+        let state = self
+            .lease
+            .store
+            .state
+            .read()
+            .map_err(|_| Error::LockPoisoned)?;
+        let mut names = state
+            .collections
+            .iter()
+            .filter(|(_, (_, created))| *created <= self.version())
+            .map(|(name, _)| name.clone())
+            .collect::<Vec<_>>();
+        names.sort();
+        Ok(names)
+    }
+
+    /// Lists a bounded page of visible documents in ascending ID order.
+    ///
+    /// The cursor is exclusive. Deleted documents are absent from the selected MVCC
+    /// version; documents deleted after the snapshot remain visible here.
+    pub fn list_documents_after(
+        &self,
+        collection: &str,
+        after: Option<DocumentId>,
+        limit: usize,
+    ) -> Result<Vec<SnapshotRow>> {
+        const MAX_PAGE: usize = 1_000;
+        if limit == 0 || limit > MAX_PAGE {
+            return Err(Error::InvalidInput(format!(
+                "snapshot page size must be between 1 and {MAX_PAGE}"
+            )));
+        }
+        let state = self
+            .lease
+            .store
+            .state
+            .read()
+            .map_err(|_| Error::LockPoisoned)?;
+        let collection_id = collection_id_at(&state, collection, self.version())?;
+        let mut rows = Vec::with_capacity(limit);
+        let start = after.map_or(std::ops::Bound::Unbounded, |id| {
+            std::ops::Bound::Excluded(id.value())
+        });
+        for (raw_id, _) in state.documents.range((start, std::ops::Bound::Unbounded)) {
+            let Some(document) = visible_document(&state, *raw_id, collection_id, self.version())
+            else {
+                continue;
+            };
+            rows.push(SnapshotRow {
+                id: DocumentId(*raw_id),
+                document: document.clone(),
+            });
+            if rows.len() == limit {
+                break;
+            }
+        }
+        Ok(rows)
+    }
+
     /// Reads an owned document version visible to this snapshot.
     pub fn get(&self, collection: &str, id: DocumentId) -> Result<Option<Document>> {
         let state = self
