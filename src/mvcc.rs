@@ -359,7 +359,8 @@ impl Snapshot {
         let mut names = state
             .collections
             .iter()
-            .filter_map(|(name, (_, created))| (*created <= self.version()).then(|| name.clone()))
+            .filter(|(_, (_, created))| *created <= self.version())
+            .map(|(name, _)| name.clone())
             .collect::<Vec<_>>();
         names.sort();
         Ok(names)
