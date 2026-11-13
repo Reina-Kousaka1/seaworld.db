@@ -11,6 +11,7 @@ mod btree;
 mod codec;
 mod document;
 mod error;
+mod export;
 mod format;
 mod index;
 mod mvcc;
@@ -35,6 +36,9 @@ pub use api::{
 };
 pub use document::{Document, MAX_DOCUMENT_BYTES, Value};
 pub use error::{Error, ErrorCode, Result};
+pub use export::{
+    SnapshotCollection, SnapshotDescriptor, SnapshotExport, SnapshotInventory, SnapshotRecord,
+};
 pub use index::{FieldPath, IndexId, MAX_FIELD_PATH_DEPTH, MAX_INDEXES};
 pub use mvcc::{
     CommitVersion, MAX_ACTIVE_SNAPSHOTS, MAX_MVCC_HISTORY_BYTES, Snapshot, SnapshotRow,
