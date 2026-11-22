@@ -38,6 +38,16 @@ Java-generated V1 fixture. The earlier `v1.1.0-beta.1` remains a historical
 pre-release. See the [SeaWorld DB 1.1 Beta release notes](docs/releases/v1.1.0-beta.md)
 for the current scope and limits.
 
+### Justine Controller integration development branch
+
+Controller integration work is isolated on `feature/jc-integration`, based on
+the current stable `main` line. The branch exists so identity and monitoring
+contract work can be reviewed independently without changing the stable
+release, Public API 1.0.0, storage formats, or existing consumers. The stable
+`main` branch remains unchanged; this branch does not add a network listener,
+open production database files from the Controller, or enable a live adapter.
+See [`docs/justine-controller-v1.md`](docs/justine-controller-v1.md).
+
 ## What SeaWorld is
 
 SeaWorld V1 is an embedded/local engine: an application links the Rust library
