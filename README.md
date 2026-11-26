@@ -340,7 +340,7 @@ The shell provides `.help`, `.open`, `.create`, `.collections`, `.indexes`,
 | Java V1 fixture | Supported compatibility fixture |
 | Ubuntu 24.04 x86_64 | CI-qualified |
 | Windows latest x86_64 | CI-qualified |
-| Linux ARM64 (GitHub-hosted) | CI job added; qualification pending a passing run |
+| Ubuntu 24.04 ARM64 (GitHub-hosted) | CI-qualified |
 | Raspberry Pi | Not V1-qualified |
 
 SeaWorld calls `File::sync_all` before reporting a successful commit and uses
@@ -367,8 +367,8 @@ See the [compatibility contract](docs/compatibility-contract.md) and
 ## Known V1 boundaries
 
 - No universal power-loss or filesystem durability guarantee.
-- ARM64/Raspberry Pi, macOS, network filesystems, removable storage, and
-  container volumes are not V1-qualified platforms.
+- Raspberry Pi hardware, 32-bit ARM, macOS, network filesystems, removable
+  storage, and container volumes are not V1-qualified platforms.
 - One writer only; SeaWorld does not promise Serializable isolation or predicate
   locking.
 - No durable external request-ID deduplication or exactly-once semantics.
@@ -379,7 +379,7 @@ See the [compatibility contract](docs/compatibility-contract.md) and
 
 ## Future architecture
 
-Post-V1 work may evaluate additional drivers, a transport service, ARM64
+Post-V1 work may evaluate additional drivers, a transport service, Raspberry Pi
 qualification, multikey indexes, stronger isolation, durable external
 idempotency, and dedicated fuzzing targets.
 
