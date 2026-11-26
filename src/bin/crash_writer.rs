@@ -15,7 +15,7 @@ fn main() {
     let mut arguments = env::args_os().skip(1);
     let Some(database_path) = arguments.next().map(PathBuf::from) else {
         eprintln!(
-            "usage: crash_writer <database-path> [--recover|--backup TARGET|--compact TARGET|--bulk-update|--bulk-delete|--upsert|--mixed-transaction|--compare-and-set]"
+            "usage: crash_writer <database-path> [--recover|--backup TARGET|--compact TARGET|--compact-verified TARGET|--create-index|--bulk-update|--bulk-delete|--upsert|--mixed-transaction|--compare-and-set]"
         );
         process::exit(2);
     };
@@ -61,7 +61,26 @@ fn main() {
         return;
     }
 
+    if mode
+        .as_deref()
+        .is_some_and(|value| value == "--compact-verified")
+    {
+        let Some(target) = arguments.next().map(PathBuf::from) else {
+            eprintln!("verified compact mode requires a destination path");
+            process::exit(2);
+        };
+        if let Err(error) = database
+            .compact_verified(target)
+            .and_then(|_| database.close())
+        {
+            eprintln!("could not create verified compacted copy: {error}");
+            process::exit(9);
+        }
+        return;
+    }
+
     let result = match mode.as_deref().and_then(|value| value.to_str()) {
+        Some("--create-index") => database.create_index("users", "score").map(|_| ()),
         Some("--update-indexed") => (|| {
             let mut transaction = database.begin_transaction()?;
             transaction.update(
