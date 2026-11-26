@@ -67,6 +67,63 @@ pub struct IntegrityReport {
     pub discarded_tail_bytes: u64,
 }
 
+/// Percentage of `MAX_DATABASE_BYTES` at which compaction is recommended.
+pub const COMPACTION_RECOMMENDED_FILL_PERCENT: u64 = 75;
+
+/// File size from which a mostly reclaimable file is worth compacting.
+pub const COMPACTION_RECOMMENDED_MIN_FILE_BYTES: u64 = 8 * 1024 * 1024;
+
+/// Physical file usage of an open handle and a labelled live-data estimate.
+///
+/// `file_bytes`, `limit_bytes` and `remaining_bytes` are exact physical
+/// values. `estimated_live_bytes` is an *estimate* of the size a compacted copy
+/// would need; it is derived from in-memory state and is not a promise about
+/// the size `write_compacted_copy` will produce.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct StorageUsage {
+    /// Physical size of the database file, including obsolete records.
+    pub file_bytes: u64,
+    /// Configured maximum file size (`MAX_DATABASE_BYTES`).
+    pub limit_bytes: u64,
+    /// Bytes that may still be appended before writes are rejected.
+    pub remaining_bytes: u64,
+    /// Estimated bytes of a compacted copy (live documents, collections,
+    /// index definitions, reachable index pages and record framing).
+    pub estimated_live_bytes: u64,
+    /// `file_bytes - estimated_live_bytes`, saturating at zero; an estimate.
+    pub estimated_reclaimable_bytes: u64,
+    /// Stored B+Tree pages, including obsolete copy-on-write pages.
+    pub persistent_page_count: usize,
+    /// B+Tree pages reachable from current index roots.
+    pub reachable_page_count: usize,
+    /// True when the file is at least `COMPACTION_RECOMMENDED_FILL_PERCENT` of
+    /// the limit, or at least `COMPACTION_RECOMMENDED_MIN_FILE_BYTES` and
+    /// estimated to be at least half reclaimable.
+    pub compaction_recommended: bool,
+}
+
+/// Evidence returned by `Database::compact_verified` before any switch.
+///
+/// The compacted file has been synchronized, published without overwriting,
+/// reopened independently through a read-only handle, integrity-checked and
+/// compared document-by-document with the source. Nothing was replaced,
+/// deleted or reopened for writing; the caller decides when to switch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct CompactionReport {
+    /// Absolute path of the new, verified compacted file.
+    pub path: PathBuf,
+    /// Format version of the compacted file (equal to the source version).
+    pub format_version: u16,
+    /// Physical source file size when compaction started.
+    pub source_file_bytes: u64,
+    /// Physical size of the compacted file.
+    pub compacted_file_bytes: u64,
+    /// Integrity report of the independently reopened compacted file.
+    pub integrity: IntegrityReport,
+}
+
 /// Public metadata for one persisted single-field index.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IndexInfo {
@@ -560,6 +617,170 @@ impl Database {
         })
     }
 
+    /// Reports physical file usage, the remaining capacity and a labelled
+    /// estimate of live data. This walks all documents and current index trees
+    /// (O(data)), so call it periodically rather than on every write.
+    pub fn storage_usage(&self) -> Result<StorageUsage> {
+        self.check_usable()?;
+        let file_bytes = self.file.metadata()?.len();
+        let record = MIN_RECORD_SIZE as u64;
+        let transactional = self.format_version >= TRANSACTION_FORMAT_VERSION;
+        // V2+ mutations carry an 8-byte transaction ID; compaction batches
+        // them into begin/commit pairs of at most MAX_TRANSACTION_OPERATIONS.
+        let transaction_id_bytes = if transactional { 8 } else { 0 };
+        let mut live = HEADER_SIZE as u64;
+        let mut operations = 0_u64;
+        for (name, collection) in &self.collections {
+            live = live.saturating_add(record + transaction_id_bytes + 8 + 4 + name.len() as u64);
+            operations += 1;
+            for (id, document) in &collection.documents {
+                let payload =
+                    encode_document_mutation(collection.id, DocumentId(*id), document)?.len();
+                live = live.saturating_add(record + transaction_id_bytes + payload as u64);
+                operations += 1;
+            }
+        }
+        if transactional {
+            let batches = operations.div_ceil(MAX_TRANSACTION_OPERATIONS as u64)
+                + self.collections.len() as u64;
+            live = live.saturating_add(batches.saturating_mul(2 * (record + 8)));
+        }
+        let mut reachable_page_count = 0_usize;
+        for index in self.secondary_indexes.values() {
+            live = live.saturating_add(
+                record + encode_index_definition(index, self.format_version)?.len() as u64,
+            );
+            if self.format_version >= PERSISTENT_INDEX_FORMAT_VERSION && index.root_page_id != 0 {
+                reachable_page_count += btree::reachable_page_count(
+                    index.root_page_id,
+                    index.id.value(),
+                    index.root_generation,
+                    &self.persistent_pages,
+                )?;
+            }
+        }
+        live = live.saturating_add(
+            (reachable_page_count as u64).saturating_mul(record + btree::PAGE_SIZE as u64),
+        );
+        let estimated_live_bytes = live.min(file_bytes);
+        let estimated_reclaimable_bytes = file_bytes.saturating_sub(estimated_live_bytes);
+        let near_limit = file_bytes.saturating_mul(100)
+            >= MAX_DATABASE_BYTES.saturating_mul(COMPACTION_RECOMMENDED_FILL_PERCENT);
+        let mostly_reclaimable = file_bytes >= COMPACTION_RECOMMENDED_MIN_FILE_BYTES
+            && estimated_reclaimable_bytes.saturating_mul(2) >= file_bytes;
+        Ok(StorageUsage {
+            file_bytes,
+            limit_bytes: MAX_DATABASE_BYTES,
+            remaining_bytes: MAX_DATABASE_BYTES.saturating_sub(file_bytes),
+            estimated_live_bytes,
+            estimated_reclaimable_bytes,
+            persistent_page_count: self.persistent_pages.len(),
+            reachable_page_count,
+            compaction_recommended: near_limit || mostly_reclaimable,
+        })
+    }
+
+    /// Writes a compacted copy and proves it before returning its path.
+    ///
+    /// Steps: write a same-version compacted copy (synchronized temporary
+    /// file, validated, then published with a no-overwrite hard link and a
+    /// directory sync where supported); reopen the published path
+    /// independently and read-only; run `check_integrity`; compare format,
+    /// database ID, collections, every live document, index definitions and
+    /// the document-ID watermark with this handle. The source file is never
+    /// modified, replaced or deleted, and this handle is not switched.
+    ///
+    /// If verification fails, an `Integrity` error is returned and the
+    /// published target is left in place for inspection: it must not be used.
+    /// After a returned error the caller must not assume the target is absent.
+    pub fn compact_verified(&self, target: impl AsRef<Path>) -> Result<CompactionReport> {
+        self.check_usable()?;
+        let source_file_bytes = self.file.metadata()?.len();
+        let target = absolute_path(target.as_ref())?;
+        self.write_compacted_copy(&target)?;
+        let target = fs::canonicalize(&target)?;
+        crash_pause_if("verified_compaction_after_publish_before_verify");
+        if crash_fault_injected("verified_compaction_reopen") {
+            return Err(Error::Io(std::io::Error::other(
+                "injected compacted-copy reopen failure",
+            )));
+        }
+        let copy = Self::open_reader(&target)?;
+        let integrity = copy.check_integrity()?;
+        self.verify_logical_copy(&copy)?;
+        let compacted_file_bytes = integrity.file_bytes;
+        copy.close()?;
+        Ok(CompactionReport {
+            path: target,
+            format_version: integrity.format_version,
+            source_file_bytes,
+            compacted_file_bytes,
+            integrity,
+        })
+    }
+
+    fn verify_logical_copy(&self, copy: &Self) -> Result<()> {
+        let mismatch = |what: &str| {
+            Err(Error::Integrity(format!(
+                "compacted copy does not match its source: {what}"
+            )))
+        };
+        if copy.format_version != self.format_version {
+            return mismatch("format version");
+        }
+        if copy.database_id != self.database_id {
+            return mismatch("database identifier");
+        }
+        if copy.document_count != self.document_count
+            || copy.collections.len() != self.collections.len()
+        {
+            return mismatch("collection or document count");
+        }
+        for (name, collection) in &self.collections {
+            let Some(copied) = copy.collections.get(name) else {
+                return mismatch("missing collection");
+            };
+            if copied.id != collection.id || copied.documents != collection.documents {
+                return mismatch("collection identifiers or documents");
+            }
+        }
+        let definitions = |database: &Self| -> Vec<(i64, i64, String, bool)> {
+            database
+                .secondary_indexes
+                .values()
+                .map(|index| {
+                    (
+                        index.id.value(),
+                        index.collection_id,
+                        index.path.to_string(),
+                        index.unique,
+                    )
+                })
+                .collect()
+        };
+        if definitions(copy) != definitions(self) {
+            return mismatch("index definitions");
+        }
+        for (id, index) in &self.secondary_indexes {
+            if copy.secondary_indexes.get(id).map(|copied| &copied.entries) != Some(&index.entries)
+            {
+                return mismatch("index entries");
+            }
+        }
+        if self.format_version >= TRANSACTION_FORMAT_VERSION
+            && (copy.next_document_id != self.next_document_id
+                || copy.document_ids_exhausted != self.document_ids_exhausted)
+        {
+            return mismatch("document-ID watermark");
+        }
+        if self.format_version >= MVCC_FORMAT_VERSION
+            && copy.next_transaction_id < self.next_transaction_id
+        {
+            return mismatch("commit-version watermark moved backwards");
+        }
+        Ok(())
+    }
+
     /// Returns index metadata in stable ID order for inspection tools.
     pub fn indexes(&self) -> Result<Vec<IndexInfo>> {
         self.check_usable()?;
@@ -875,8 +1096,21 @@ impl Database {
                 &self.persistent_pages,
                 keys,
             )?;
-            self.append_index_pages(&update.pages)?;
             index.root_page_id = update.root_page_id;
+            index.root_generation = generation;
+            // Reserve room for every page and the definition before writing any
+            // page, so a full file rejects index creation without growing.
+            let definition = encode_index_definition(&index, self.format_version)?;
+            let page_bytes = update.pages.values().try_fold(0_u64, |size, page| {
+                size.checked_add((MIN_RECORD_SIZE + page.len()) as u64)
+                    .ok_or_else(|| Error::Limit("index page batch overflow".into()))
+            })?;
+            let required = page_bytes
+                .checked_add((MIN_RECORD_SIZE + definition.len()) as u64)
+                .ok_or_else(|| Error::Limit("index creation size overflow".into()))?;
+            self.ensure_file_capacity(required)?;
+            self.append_index_pages(&update.pages)?;
+            crash_pause_if("index_create_after_pages_before_definition");
             index.root_generation = generation;
             self.next_page_id = update.next_page_id;
         }
@@ -888,9 +1122,15 @@ impl Database {
         Ok(id)
     }
 
+    /// Appends new standalone index pages as one batch with a single sync.
+    ///
+    /// Pages stay unreachable until a later, separately synchronized index
+    /// definition or root publication names them, so a crash inside this batch
+    /// can only leave unreachable pages (truncated or ignored on recovery).
     fn append_index_pages(&mut self, pages: &BTreeMap<u64, Vec<u8>>) -> Result<()> {
+        let mut expected_page_id = self.next_page_id;
         for (page_id, bytes) in pages {
-            if *page_id != self.next_page_id {
+            if *page_id != expected_page_id {
                 return Err(Error::Integrity(
                     "new B+Tree page IDs must be contiguous".into(),
                 ));
@@ -901,12 +1141,19 @@ impl Database {
                     "B+Tree page ID mismatch before write".into(),
                 ));
             }
-            self.append_record(RecordType::IndexPage, bytes)?;
-            self.persistent_pages.insert(*page_id, bytes.clone());
-            self.next_page_id = page_id
+            expected_page_id = page_id
                 .checked_add(1)
                 .ok_or_else(|| Error::Limit("B+Tree page ID space exhausted".into()))?;
         }
+        let records: Vec<_> = pages
+            .values()
+            .map(|bytes| (RecordType::IndexPage, bytes.as_slice()))
+            .collect();
+        self.append_records(&records)?;
+        for (page_id, bytes) in pages {
+            self.persistent_pages.insert(*page_id, bytes.clone());
+        }
+        self.next_page_id = expected_page_id;
         Ok(())
     }
 
@@ -1391,13 +1638,7 @@ impl Database {
             size.checked_add(block.len() as u64)
                 .ok_or_else(|| Error::Limit("transaction file length overflow".into()))
         })?;
-        let current_size = self.file.metadata()?.len();
-        if current_size
-            .checked_add(batch_size)
-            .is_none_or(|size| size > MAX_DATABASE_BYTES)
-        {
-            return Err(Error::Limit("database file size limit reached".into()));
-        }
+        self.ensure_file_capacity(batch_size)?;
 
         self.file.lock()?;
         if let Err(error) = self.file.seek(SeekFrom::End(0)) {
@@ -1936,7 +2177,7 @@ impl Database {
             return Err(Error::Io(error));
         }
         crash_pause_if("compaction_after_publish_before_directory_sync");
-        if let Err(error) = sync_parent_directory(&target) {
+        if let Err(error) = sync_published_directory(&target) {
             let _ = fs::remove_file(&temporary);
             return Err(error);
         }
@@ -2112,7 +2353,7 @@ impl Database {
             return Err(Error::Io(error));
         }
         crash_pause_if("compaction_after_publish_before_directory_sync");
-        if let Err(error) = sync_parent_directory(&target) {
+        if let Err(error) = sync_published_directory(&target) {
             let _ = fs::remove_file(&temporary);
             return Err(error);
         }
@@ -2956,28 +3197,44 @@ impl Database {
     }
 
     fn append_record(&mut self, record_type: RecordType, payload: &[u8]) -> Result<()> {
+        self.append_records(&[(record_type, payload)])
+    }
+
+    /// Appends standalone records under one file lock and one `sync_all`.
+    ///
+    /// The capacity for the whole batch is checked before any byte is written,
+    /// so a capacity rejection leaves the file and the handle unchanged. A
+    /// write or sync failure poisons the handle exactly as for one record; the
+    /// sync is never retried. Records are only standalone (non-transactional)
+    /// ones whose interrupted suffix recovery may truncate independently.
+    fn append_records(&mut self, records: &[(RecordType, &[u8])]) -> Result<()> {
         self.check_writable()?;
-        if self.next_sequence <= 0 || self.next_sequence == i64::MAX {
-            return Err(Error::Limit("record sequence space is exhausted".into()));
+        if records.is_empty() {
+            return Ok(());
         }
-        let total_length = MIN_RECORD_SIZE
-            .checked_add(payload.len())
-            .ok_or_else(|| Error::Limit("record length overflow".into()))?;
-        if total_length > MAX_RECORD_SIZE {
-            return Err(Error::Limit(
-                "record exceeds the 17 MiB maximum block size".into(),
-            ));
+        let mut blocks = Vec::with_capacity(records.len());
+        let mut sequence = self.next_sequence;
+        let mut batch_size = 0_u64;
+        for (record_type, payload) in records {
+            if sequence <= 0 || sequence == i64::MAX {
+                return Err(Error::Limit("record sequence space is exhausted".into()));
+            }
+            let total_length = MIN_RECORD_SIZE
+                .checked_add(payload.len())
+                .ok_or_else(|| Error::Limit("record length overflow".into()))?;
+            if total_length > MAX_RECORD_SIZE {
+                return Err(Error::Limit(
+                    "record exceeds the 17 MiB maximum block size".into(),
+                ));
+            }
+            let block = encode_record(*record_type, sequence, payload)?;
+            batch_size = batch_size
+                .checked_add(block.len() as u64)
+                .ok_or_else(|| Error::Limit("record batch length overflow".into()))?;
+            blocks.push(block);
+            sequence += 1;
         }
-        let current_size = self.file.metadata()?.len();
-        if current_size
-            .checked_add(total_length as u64)
-            .is_none_or(|size| size > MAX_DATABASE_BYTES)
-        {
-            return Err(Error::Limit(
-                "database file size limit reached; write a compacted copy and switch files manually".into(),
-            ));
-        }
-        let block = encode_record(record_type, self.next_sequence, payload)?;
+        self.ensure_file_capacity(batch_size)?;
         self.file.lock()?;
         if let Err(error) = self.file.seek(SeekFrom::End(0)) {
             let _ = self.file.unlock();
@@ -2986,10 +3243,13 @@ impl Database {
         let write_result = (|| -> std::io::Result<()> {
             crash_before_write();
             if crash_during_write() {
-                self.file.write_all(&block[..(block.len() / 2).max(1)])?;
+                let first = &blocks[0];
+                self.file.write_all(&first[..(first.len() / 2).max(1)])?;
                 crash_pause("during_write");
             }
-            self.file.write_all(&block)?;
+            for block in &blocks {
+                self.file.write_all(block)?;
+            }
             crash_after_write();
             self.file.sync_all()?;
             crash_after_sync();
@@ -3004,7 +3264,25 @@ impl Database {
             self.write_failed = true;
             return Err(Error::Io(error));
         }
-        self.next_sequence += 1;
+        self.next_sequence = sequence;
+        Ok(())
+    }
+
+    /// Rejects a write that would grow the file past `MAX_DATABASE_BYTES`.
+    ///
+    /// This runs before any append, so it never poisons the handle.
+    fn ensure_file_capacity(&self, additional: u64) -> Result<()> {
+        let file_bytes = self.file.metadata()?.len();
+        if file_bytes
+            .checked_add(additional)
+            .is_none_or(|size| size > MAX_DATABASE_BYTES)
+        {
+            return Err(Error::CapacityExhausted {
+                file_bytes,
+                requested_bytes: additional,
+                limit_bytes: MAX_DATABASE_BYTES,
+            });
+        }
         Ok(())
     }
 
@@ -3813,9 +4091,11 @@ fn write_snapshot_record(
         .checked_add(block.len() as u64)
         .ok_or_else(|| Error::Limit("database file length overflow".into()))?;
     if updated_size > MAX_DATABASE_BYTES {
-        return Err(Error::Limit(
-            "compacted database exceeds the 128 MiB file limit".into(),
-        ));
+        return Err(Error::CapacityExhausted {
+            file_bytes: *file_size,
+            requested_bytes: block.len() as u64,
+            limit_bytes: MAX_DATABASE_BYTES,
+        });
     }
     file.write_all(&block)?;
     *file_size = updated_size;
@@ -3997,6 +4277,16 @@ fn random_database_id() -> Result<[u8; 16]> {
     Ok(id)
 }
 
+/// Synchronizes the directory of a just-published compacted copy.
+fn sync_published_directory(path: &Path) -> Result<()> {
+    if crash_fault_injected("compaction_directory_sync") {
+        return Err(Error::Io(std::io::Error::other(
+            "injected directory sync failure",
+        )));
+    }
+    sync_parent_directory(path)
+}
+
 #[cfg(unix)]
 fn sync_parent_directory(path: &Path) -> Result<()> {
     let parent = path
@@ -4011,6 +4301,18 @@ fn sync_parent_directory(path: &Path) -> Result<()> {
 fn sync_parent_directory(_path: &Path) -> Result<()> {
     // Rust's portable File API has no directory-sync operation on Windows.
     Ok(())
+}
+
+/// Test-only fault injection: `SEAWORLD_FAIL_AT=<point>` makes the named
+/// operation return an error instead of performing it.
+#[cfg(feature = "crash-test")]
+fn crash_fault_injected(point: &str) -> bool {
+    std::env::var("SEAWORLD_FAIL_AT").is_ok_and(|configured| configured == point)
+}
+
+#[cfg(not(feature = "crash-test"))]
+fn crash_fault_injected(_point: &str) -> bool {
+    false
 }
 
 #[cfg(feature = "crash-test")]

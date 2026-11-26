@@ -46,8 +46,9 @@ pub use query::{
 };
 pub use sql::{MAX_SQL_BYTES, MAX_SQL_TOKENS, SqlResult, SqlRow};
 pub use storage::{
+    COMPACTION_RECOMMENDED_FILL_PERCENT, COMPACTION_RECOMMENDED_MIN_FILE_BYTES, CompactionReport,
     Database, IndexInfo, IntegrityReport, MAX_COLLECTIONS, MAX_DATABASE_BYTES, MAX_DOCUMENTS,
-    RecoveryReport, Transaction,
+    RecoveryReport, StorageUsage, Transaction,
 };
 pub use update::{
     CompareAndSetExpectation, CompareAndSetResult, DocumentOperation, apply_document_operations,

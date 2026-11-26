@@ -18,6 +18,16 @@ pub enum Error {
     Integrity(String),
     InvalidInput(String),
     Limit(String),
+    /// The database file cannot grow by `requested_bytes` without exceeding
+    /// `limit_bytes`. The operation was rejected before any byte was appended:
+    /// the handle stays usable and committed data stays readable. Write a
+    /// compacted copy (for example with `Database::compact_verified`) and
+    /// switch to it explicitly; retrying the same mutation cannot succeed.
+    CapacityExhausted {
+        file_bytes: u64,
+        requested_bytes: u64,
+        limit_bytes: u64,
+    },
     NotFound(String),
     Duplicate(String),
     UpgradeRequired(String),
@@ -97,7 +107,9 @@ impl Error {
             Self::UnsupportedFeature(_) => ErrorCode::IncompatibleFormat,
             Self::Integrity(_) => ErrorCode::IntegrityFailure,
             Self::InvalidInput(_) | Self::Query(_) => ErrorCode::InvalidArgument,
-            Self::Limit(_) => ErrorCode::ResourceLimit,
+            // Capacity exhaustion keeps the stable `resource_limit` category for
+            // Public API 1.0.0 compatibility; use `is_capacity_exhausted`.
+            Self::Limit(_) | Self::CapacityExhausted { .. } => ErrorCode::ResourceLimit,
             Self::NotFound(_) => ErrorCode::NotFound,
             Self::Duplicate(_) => ErrorCode::UniqueConstraint,
             Self::ConstraintViolation(_) => ErrorCode::Conflict,
@@ -107,6 +119,16 @@ impl Error {
             Self::TransactionState(_) => ErrorCode::TransactionState,
             Self::LockPoisoned => ErrorCode::InternalInvariant,
         }
+    }
+}
+
+impl Error {
+    /// Returns true when the database file has no room for the rejected write.
+    ///
+    /// This is never an I/O, corruption, or integrity failure: the handle is
+    /// not poisoned and no bytes of the rejected operation were written.
+    pub const fn is_capacity_exhausted(&self) -> bool {
+        matches!(self, Self::CapacityExhausted { .. })
     }
 }
 
@@ -134,6 +156,15 @@ impl fmt::Display for Error {
             Self::Integrity(message) => write!(formatter, "database integrity error: {message}"),
             Self::InvalidInput(message) => write!(formatter, "invalid input: {message}"),
             Self::Limit(message) => write!(formatter, "database limit exceeded: {message}"),
+            Self::CapacityExhausted {
+                file_bytes,
+                requested_bytes,
+                limit_bytes,
+            } => write!(
+                formatter,
+                "database file capacity exhausted: {file_bytes} of {limit_bytes} bytes used, \
+                 {requested_bytes} more required; write a compacted copy and switch files explicitly"
+            ),
             Self::NotFound(message) => write!(formatter, "not found: {message}"),
             Self::Duplicate(message) => write!(formatter, "duplicate: {message}"),
             Self::UpgradeRequired(message) => write!(formatter, "upgrade required: {message}"),

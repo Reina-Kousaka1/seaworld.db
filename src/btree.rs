@@ -496,6 +496,30 @@ pub(crate) fn collect_entries_with_overlay(
     Ok(entries)
 }
 
+/// Counts the distinct pages reachable from one validated root.
+pub(crate) fn reachable_page_count(
+    root_page_id: u64,
+    index_id: i64,
+    root_generation: u64,
+    pages: &HashMap<u64, Vec<u8>>,
+) -> Result<usize> {
+    let mut visited = HashSet::new();
+    let mut entries = Vec::new();
+    visit_page(
+        root_page_id,
+        index_id,
+        root_generation,
+        pages,
+        &BTreeMap::new(),
+        &mut visited,
+        &mut entries,
+        0,
+        None,
+        None,
+    )?;
+    Ok(visited.len())
+}
+
 #[derive(Default)]
 struct Bounds {
     min: Option<TreeKey>,
