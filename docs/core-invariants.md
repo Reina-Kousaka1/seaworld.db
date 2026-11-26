@@ -18,6 +18,8 @@ not a commitment to adopt another database's storage engine or protocol.
 | Compaction/backup safety | A same-directory temporary copy is validated before no-overwrite hard-link publication. Source data is unchanged; V4 compaction retains V4 and rebuilds live persistent roots. |
 | Format compatibility | V1--V4 remain readable; the Java V1 fixture is an integration fixture. New files use V4. |
 | Semantics-neutral diagnostics | Optimization observation is opt-in, bounded, non-persistent, and recommendation-only. |
+| Capacity rejection | A write that would exceed the 128 MiB file limit is rejected with `CapacityExhausted` before any append, including whole V4 index creations. The file, handle and committed state are unchanged; no retry occurs. |
+| Index creation ordering | V4 index pages are appended as one standalone batch and synchronized once, then the index definition is appended and synchronized. The definition never becomes durable before the pages it references; interrupted batches leave only unreachable pages. |
 | Writer concurrency | One cooperating writer is enforced by a sidecar lock and Rust mutable ownership. This prevents overlapping writer commits; it is not multi-writer MVCC. |
 
 The file-sync result is the API acknowledgement boundary, not a universal

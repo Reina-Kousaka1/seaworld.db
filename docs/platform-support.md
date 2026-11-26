@@ -13,9 +13,11 @@ on:
 | --- | --- | --- |
 | Ubuntu 24.04 x86_64 | Build and engine behavior in the hosted CI runner | Every Linux distribution, filesystem, kernel, mount option, or power-loss behavior |
 | Windows latest x86_64 | Build and engine behavior in the hosted CI runner | Every Windows release, filesystem, network share, antivirus interaction, or power-loss behavior |
+| Ubuntu 24.04 ARM64 (`ubuntu-24.04-arm`) | **Pending:** the job runs the same format, lint, full test, crash and capacity suite on a native GitHub-hosted ARM64 runner; it counts as evidence only once it has passed | Raspberry Pi hardware, SD cards, USB storage, 32-bit ARM, or power-loss behavior |
 
 The CI matrix is SeaWorld's currently supported V1 qualification baseline.
-Linux ARM64, Raspberry Pi, macOS, network filesystems, removable storage, and
+The ARM64 job is native hosted hardware, not QEMU emulation, and it is not a
+Raspberry Pi qualification. Raspberry Pi, macOS, network filesystems, removable storage, and
 container volume drivers are not V1-qualified merely because Rust can target
 them. They need a separate build, crash, locking, and filesystem assessment.
 

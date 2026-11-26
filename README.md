@@ -291,12 +291,23 @@ watermarks never move backwards, although compaction can advance a watermark
 while reconstructing a copy. Backup sources may be V1–V4; backup and restore
 output V4.
 
+Indexed V4 workloads grow the file through copy-on-write pages. A write that
+would exceed the 128 MiB file limit is rejected before any byte is written with
+`Error::CapacityExhausted` (`is_capacity_exhausted()`, stable code
+`resource_limit`); the handle stays usable. `Database::storage_usage()` reports
+physical size, remaining capacity and a labelled live-data estimate, and
+`Database::compact_verified(target)` writes, reopens, checks and compares a
+compacted copy before returning its path for an explicit switch. See
+[backup and restore](docs/backup.md#file-capacity-and-verified-compaction).
+
 ## CLI
 
 The `seaworld` binary opens an interactive embedded shell:
 
 ```sh
-seaworld app.seaworld.db
+seaworld app.seaworld.db            # opens, or creates and reports it on stderr
+seaworld --open app.seaworld.db     # existing file only; never creates
+seaworld --create new.seaworld.db   # new file only; never opens an existing one
 ```
 
 Its public file-management commands are:
@@ -306,11 +317,17 @@ seaworld check DATABASE.seaworld.db
 seaworld verify BACKUP.seaworld.db
 seaworld backup SOURCE.seaworld.db NEW_BACKUP.seaworld.db
 seaworld restore BACKUP.seaworld.db NEW_DATABASE.seaworld.db
+seaworld usage DATABASE.seaworld.db
+seaworld compact SOURCE.seaworld.db NEW_COMPACTED.seaworld.db
 ```
 
-The shell provides `.help`, `.open`, `.collections`, `.indexes`, `.schema`,
-`.info`, `.check`, and `.quit`, plus the documented SQL V0 subset. No `compact`
-CLI command is provided in V1.
+`compact` runs the verified compaction workflow from a read-only source handle
+and never changes or replaces the source.
+
+The shell provides `.help`, `.open`, `.create`, `.collections`, `.indexes`,
+`.schema`, `.info`, `.check`, and `.quit`, plus the documented SQL V0 subset.
+`.open` keeps its open-or-create behavior but reports a newly created file;
+`.create` only creates. `.check` checks the currently open file.
 
 ## Compatibility, platforms, and durability
 
@@ -323,7 +340,8 @@ CLI command is provided in V1.
 | Java V1 fixture | Supported compatibility fixture |
 | Ubuntu 24.04 x86_64 | CI-qualified |
 | Windows latest x86_64 | CI-qualified |
-| ARM64 / Raspberry Pi | Not V1-qualified |
+| Linux ARM64 (GitHub-hosted) | CI job added; qualification pending a passing run |
+| Raspberry Pi | Not V1-qualified |
 
 SeaWorld calls `File::sync_all` before reporting a successful commit and uses
 cooperating file locks plus same-directory no-overwrite publication for copies.
